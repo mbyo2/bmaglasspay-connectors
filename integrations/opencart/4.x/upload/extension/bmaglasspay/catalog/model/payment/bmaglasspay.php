@@ -11,8 +11,7 @@ class Bmaglasspay extends \Opencart\System\Engine\Model
 {
     public function getMethod(array $address = []): array
     {
-        $methods = $this->getMethods($address);
-        return $methods[0] ?? [];
+        return $this->getMethods($address);
     }
 
     public function getMethods(array $address = []): array
@@ -29,10 +28,25 @@ class Bmaglasspay extends \Opencart\System\Engine\Model
             return [];
         }
         $this->load->language('extension/bmaglasspay/payment/bmaglasspay');
-        return [[
+        $name = $this->language->get('text_title');
+        // OC 4.1 checkout contract (mirrors core's own payment models,
+        // e.g. COD): ONE method array carrying an `option` map. The
+        // checkout's payment_method.save explodes the buyer's selection
+        // on '.' and requires payment_methods[code]['option'][subcode]
+        // to exist — a method without options is listed but can never
+        // be selected ("Payment method required!"). 'title' is kept
+        // alongside 'name' for 4.0.0-era cores.
+        return [
             'code' => 'bmaglasspay',
-            'name' => $this->language->get('text_title'),
+            'name' => $name,
+            'title' => $name,
+            'option' => [
+                'bmaglasspay' => [
+                    'code' => 'bmaglasspay.bmaglasspay',
+                    'name' => $name,
+                ],
+            ],
             'sort_order' => (int) $this->config->get('payment_bmaglasspay_sort_order'),
-        ]];
+        ];
     }
 }
