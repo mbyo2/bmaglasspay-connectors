@@ -42,7 +42,7 @@ try {
 
 // Webhook verification (X-BMaGlass-Signature over the exact raw body):
 $event = Client::parseWebhookEvent(file_get_contents('php://input'),
-                                   $_SERVER['HTTP_X_BMGLASS_SIGNATURE'] ?? '',
+                                   $_SERVER['HTTP_X_BMAGLASS_SIGNATURE'] ?? '',
                                    $webhookSecret);
 ```
 

@@ -77,7 +77,7 @@ class Bmaglasspay extends \Opencart\System\Engine\Controller
     public function callback(): void
     {
         $raw = (string) file_get_contents('php://input');
-        $signature = (string) ($this->request->server['HTTP_X_BMGLASS_SIGNATURE'] ?? '');
+        $signature = (string) ($this->request->server['HTTP_X_BMAGLASS_SIGNATURE'] ?? '');
         $secret = (string) $this->config->get('payment_bmaglasspay_webhook_secret');
         require_once DIR_SYSTEM . 'library/bmaglass/ApiException.php';
         require_once DIR_SYSTEM . 'library/bmaglass/Client.php';

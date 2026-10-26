@@ -17,7 +17,7 @@ class BmaglasspayWebhookModuleFrontController extends ModuleFrontController
     public function initContent()
     {
         $raw = (string) file_get_contents('php://input');
-        $signature = isset($_SERVER['HTTP_X_BMGLASS_SIGNATURE']) ? (string) $_SERVER['HTTP_X_BMGLASS_SIGNATURE'] : '';
+        $signature = isset($_SERVER['HTTP_X_BMAGLASS_SIGNATURE']) ? (string) $_SERVER['HTTP_X_BMAGLASS_SIGNATURE'] : '';
         $secret = $this->module->webhookSecret();
         header('Content-Type: text/plain');
         if ($secret === '' || !Client::verifyWebhookSignature($raw, $signature, $secret)) {
