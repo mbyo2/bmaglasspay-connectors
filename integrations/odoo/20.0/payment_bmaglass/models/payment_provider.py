@@ -105,6 +105,15 @@ class PaymentProvider(models.Model):
         """Register this Odoo instance's webhook endpoint with BMaGlass."""
         self.ensure_one()
         client = self._bmaglass_client()
+        # Retire the previous registration first (best-effort): without
+        # this, every re-register orphans the old webhook on the account
+        # and events fan out to stale endpoints (install-test finding,
+        # same pattern as the WooCommerce fix).
+        if self.bmaglass_webhook_id:
+            try:
+                client.delete_webhook(self.bmaglass_webhook_id)
+            except BMaGlassError:
+                _logger.info("BMaGlass: retiring the previous webhook failed (non-fatal).")
         try:
             hook = client.create_webhook(
                 self._bmaglass_webhook_url(),
