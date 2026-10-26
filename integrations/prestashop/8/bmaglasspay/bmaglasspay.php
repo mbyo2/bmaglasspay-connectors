@@ -264,11 +264,16 @@ class Bmaglasspay extends PaymentModule
             if (!Validate::isLoadedObject($order)) {
                 continue;
             }
-            $order->setCurrentState((int) Configuration::get('PS_OS_PAYMENT'));
+            // Record OUR payment (with the link code as transaction id)
+            // BEFORE the state change: entering a paid state makes core
+            // auto-book a transaction-less payment for the invoice's
+            // rest-paid amount — with ours booked first, rest-paid is 0
+            // and core books nothing, so the order is not double-counted.
+            $order->addOrderPayment((float) $order->total_paid, 'BMaGlass Pay', $row['link_code']);
             Db::getInstance()->execute(
                 'UPDATE `' . _DB_PREFIX_ . 'bmaglasspay_orders` SET `paid` = 1 WHERE `id_order` = ' . (int) $row['id_order']
             );
-            $order->addOrderPayment((float) $order->total_paid, 'BMaGlass Pay', $row['link_code']);
+            $order->setCurrentState((int) Configuration::get('PS_OS_PAYMENT'));
             $completed++;
         }
         return $completed;
