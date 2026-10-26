@@ -58,16 +58,29 @@ class PaymentTransaction(models.Model):
 
 
     def _bmaglass_log(self, message):
-        """Post a settlement note on the transaction's chatter.
+        """Record a settlement note without ever breaking settlement.
 
-        `_log_message_on_transaction` does not exist on
-        payment.transaction in any of 16.0-19.0 (install-test B5 proved
-        it live on 17.0; the earlier note claiming it was present in
-        17.0/18.0 was wrong), so
-        mail.thread's message_post — available in every Odoo version —
-        is used instead.
+        payment.transaction is not a mail.thread in 17.0-20.0 (no
+        message_post) and has no _log_message_on_transaction in any of
+        16.0-20.0 (install-test finding B5, proven live on 17.0). The
+        core-supported channel is _log_message_on_linked_documents,
+        which the sale module overrides to post on the linked sale
+        order. The fallbacks keep the note in the server log if a
+        version changes the API again — logging must never roll back
+        a settlement.
         """
-        self.message_post(body=message)
+        self.ensure_one()
+        try:
+            log_on_docs = getattr(self, "_log_message_on_linked_documents", None)
+            if callable(log_on_docs):
+                log_on_docs(message)
+            elif hasattr(self, "message_post"):
+                self.message_post(body=message)
+            else:
+                _logger.info("BMaGlass: %s", message)
+        except Exception:
+            _logger.exception(
+                "BMaGlass: failed to log the settlement note for %s", self.reference)
 
     # -- settlement: webhook first, reconciliation as fallback --------------
     def _bmaglass_settle_from_paid_event(self, data):
