@@ -155,14 +155,28 @@ class BMaGlassClient:
     # -- transport -----------------------------------------------------
     def _request(self, method, path, body=None, headers=None):
         url = "%s/%s" % (self.base_url, path.lstrip("/"))
-        hdrs = {"X-Api-Key": self.api_key, "Content-Type": "application/json"}
+        hdrs = {"X-Api-Key": self.api_key, "Content-Type": "application/json",
+                "User-Agent": "BMaGlassPay-Odoo/1.0 (+https://bmaglasspay.online/developers)"}
         if headers:
             hdrs.update(headers)
         raw = json.dumps(body).encode("utf-8") if body is not None else None
-        if self._opener is not None:
-            status, text = self._opener(method, url, hdrs, raw)
-        else:
-            status, text = self._urllib(method, url, hdrs, raw)
+        # Bounded retry for reads only: a transport cut (proxy/WAF
+        # connection resets, mid-body truncations) must not fail a
+        # balance/list check that a second attempt completes. POSTs are
+        # never retried here - a create whose response was cut may
+        # already exist server-side, and link creation carries no
+        # idempotency key to make a blind retry safe (B13).
+        attempts = 3 if method == "GET" else 1
+        for attempt in range(attempts):
+            try:
+                if self._opener is not None:
+                    status, text = self._opener(method, url, hdrs, raw)
+                else:
+                    status, text = self._urllib(method, url, hdrs, raw)
+                break
+            except BMaGlassError:
+                if attempt == attempts - 1:
+                    raise
         try:
             parsed = json.loads(text) if text else {}
         except ValueError:
