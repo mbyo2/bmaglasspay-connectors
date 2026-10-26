@@ -75,7 +75,8 @@ vector, `payment_link.paid` semantic guard). The client was
 additionally live-proven against the production developer API in
 the original programme (QA merchant, live key).
 
-**Boundary:** no Odoo runtime (PostgreSQL) exists in the build
-environment, so install-level behaviour is docs-verified against
-each version's official reference — not install-proven. Smoke-test
-on staging first.
+**Install-tested 2026-10-26** on real Odoo 16/17/18/20 installs
+(fresh PostgreSQL databases, genuine website_sale checkouts paid
+through the live API) — see the install-level testing addendum for
+per-version depth. The 19.0 variant is install-tested to the depth
+recorded there.
