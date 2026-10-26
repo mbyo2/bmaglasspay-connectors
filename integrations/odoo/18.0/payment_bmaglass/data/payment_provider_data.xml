@@ -4,6 +4,9 @@
         <field name="name">BMaGlass Pay</field>
         <field name="code">bmaglass</field>
         <field name="state">disabled</field>
+        <field name="is_published">True</field>
+        <field name="payment_method_ids"
+               eval="[Command.set([ref('payment_method_bmaglass')])]"/>
         <field name="module_id" ref="base.module_payment_bmaglass"/>
         <field name="redirect_form_view_id" ref="payment_bmaglass.redirect_form"/>
         <field name="company_id" ref="base.main_company"/>

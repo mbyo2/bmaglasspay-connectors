@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Odoo 17+'s payment framework only offers a provider at checkout
+         through a linked payment method; without this record the enabled
+         provider silently never renders (install-test finding B4,
+         verified against the canonical payment_demo module). -->
+    <record id="payment_method_bmaglass" model="payment.method">
+        <field name="name">BMaGlass Pay</field>
+        <field name="code">bmaglass</field>
+        <field name="sequence">10</field>
+        <field name="support_tokenization">False</field>
+        <field name="support_express_checkout">False</field>
+    </record>
+</odoo>
