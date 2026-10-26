@@ -24,7 +24,7 @@ are the currencies BMaGlass wallets hold.
     "license": "LGPL-3",
     "depends": ["payment"],
     "data": [
-        "security/ir.model.access.csv",
+        "security/ir.access.csv",
         "views/payment_provider_views.xml",
         "views/payment_bmaglass_templates.xml",
         "data/payment_method_data.xml",
