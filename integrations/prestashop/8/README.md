@@ -42,8 +42,5 @@ rewritten for the sake of looking different.
 `php -l` clean on every file; the vendored client in
 `classes/sdk/` is byte-identical to the PHP SDK
 (`integrations/check-vendored-clients.sh`), whose own live-API
-protocol proof passed. **No PrestaShop runtime exists in the build
-environment**, so install-level behaviour is written to the
-documented 8.x module API and not install-proven — smoke-test on a
-staging shop first. (8.2.x receives security fixes until
+protocol proof passed. **Install-tested 2026-10-26 on PrestaShop 8.1.7: PASS** — genuine guest checkout → hosted pay page → signed webhook settlement, exactly one payment booked. (8.2.x receives security fixes until
 PrestaShop 10.)

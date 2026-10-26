@@ -78,7 +78,12 @@ method to an unsupported platform.
 `php -l` clean on every file; `composer.json` parses and carries
 the range above; the vendored client is the SDK client whose own
 live-API protocol proof passed in the connectors mission (see the
-mission addendum). **A full Magento runtime install was not
-available in the build sandbox** — install-level behaviour follows
-the standard redirect-gateway pattern and should be smoke-tested
-on a staging store before production.
+mission addendum). **Install-tested 2026-10-26 on Magento 2.4.8: PASS** (MySQL 8 +
+OpenSearch 2.19) — module enables, the method appears at checkout
+once a live key is saved, a genuine guest checkout hands off to the
+hosted pay page for the exact total, and a signed webhook delivery
+captures the order to `processing` exactly once. The install test
+found and fixed seven real defects in this module (encrypted-key
+decryption, two Magento-1-era helper calls, the payment_review
+settlement state handling, and the CSRF interface signatures) —
+see VERSIONS.md.

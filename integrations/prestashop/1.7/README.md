@@ -49,7 +49,4 @@ the three builds share their logic and differ in declared platform
 `php -l` clean on every file; the vendored client in
 `classes/sdk/` is byte-identical to the PHP SDK
 (`integrations/check-vendored-clients.sh`), whose own live-API
-protocol proof passed. **No PrestaShop runtime exists in the build
-environment**, so install-level behaviour is written to the
-documented 1.7 module API and not install-proven — smoke-test on a
-staging shop first.
+protocol proof passed. **Install-tested 2026-10-26 on PrestaShop 1.7.8.11: PASS** — genuine guest checkout → hosted pay page → signed webhook settlement, exactly one payment booked.

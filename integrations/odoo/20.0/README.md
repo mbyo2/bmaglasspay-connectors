@@ -66,9 +66,9 @@ fallback, exactly-once settlement.
 - The vendored client is byte-identical across all five Odoo
   variants (`../check-clients.sh`) and was live-proven against the
   production developer API in the original programme.
-- **No Odoo runtime was available in the build environment**, so
-  install-level behaviour is docs-verified against the Odoo 20
-  (master) reference, not install-proven. The state-handling
-  adaptation is deliberately defensive (nothing in this variant
-  reads or writes a provider `state` value). Smoke-test on a
-  staging instance first.
+- **Install-tested 2026-10-26 on Odoo 20.0: PASS** — genuine
+  website checkout → hosted pay page → settlement proven on BOTH
+  the webhook path (core's notification queue) and the reconcile
+  cron path; duplicates idempotent, bad signatures refused. The
+  state-handling adaptation is deliberately defensive (nothing in
+  this variant reads or writes a provider `state` value).

@@ -50,6 +50,4 @@ platform. Per-variant details are in each folder's README.
 
 `php -l` clean on every file in every variant; vendored clients
 byte-identical to the PHP SDK client, whose live-API protocol
-proof passed in the original programme. **No PrestaShop runtime
-exists in the build environment** — install-level behaviour is
-docs-verified, not install-proven. Smoke-test on staging first.
+proof passed in the original programme. **Install-tested 2026-10-26: PASS on PrestaShop 9.0.0, 8.1.7 and 1.7.8.11** — genuine guest checkouts → hosted pay page → signed webhook settlement to "Payment accepted" with exactly one payment booked per order.

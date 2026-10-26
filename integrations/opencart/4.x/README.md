@@ -30,6 +30,4 @@ complete exactly once.
 
 `php -l` clean on every file; the vendored client is
 byte-identical to the PHP SDK client whose live-API protocol
-proof passed in the original programme. **No OpenCart runtime
-exists in the build environment** — install-level behaviour is
-docs-verified, not install-proven. Smoke-test on staging first.
+proof passed in the original programme. **Install-tested 2026-10-26 on OpenCart 4.1.0.4: PASS** — genuine guest checkout → hosted pay page → signed webhook settlement to the configured complete status, exactly once.

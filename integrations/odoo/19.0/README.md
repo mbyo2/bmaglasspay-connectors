@@ -58,7 +58,4 @@ fallback, exactly-once settlement.
 - The vendored client is byte-identical across all five Odoo
   variants (`../check-clients.sh`) and was live-proven against the
   production developer API in the original programme.
-- **No Odoo runtime was available in the build environment**, so
-  install-level behaviour is docs-verified against the Odoo 19.0
-  reference, not install-proven. Smoke-test on a staging instance
-  first.
+- **Install-tested 2026-10-26 on Odoo 19.0: PASS** — genuine website checkout → hosted pay page → signed webhook settlement (tx done), duplicates idempotent, bad signatures refused. Sale-order confirmation after `done` is Odoo core post-processing.

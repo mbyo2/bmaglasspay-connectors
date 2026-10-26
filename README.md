@@ -36,11 +36,11 @@ what was adapted per version, and what was excluded and why — is in
 
 | Stack | Versions supported | Path | Status |
 |---|---|---|---|
-| WordPress / WooCommerce | WP 6.0+, WooCommerce 7.0 – 11.2 (HPOS + legacy storage; Checkout Blocks + classic) — one plugin | [`integrations/wordpress`](integrations/wordpress) | Unit tests (client, reconciler, Blocks integration) + live-API protocol proof passed. No WP/WC runtime in the build environment — smoke-test on staging first. |
-| Odoo | **16.0, 17.0, 18.0, 19.0, 20.0** — one module per major | [`integrations/odoo`](integrations/odoo) | 14 client tests green per variant; clients byte-identical across variants; live-API protocol proof passed (17.0). No Odoo runtime in the build environment — smoke-test on staging first. |
-| Magento 2 | **2.4.6 – 2.4.9** — one module, Composer-ranged (`magento/framework 103.0.*`, PHP ^8.1) | [`integrations/magento`](integrations/magento) | `php -l` clean; vendored client proven identical to the PHP SDK. Runtime smoke test still owed — staging first. |
-| PrestaShop | **1.7, 8.x, 9.x** — one build per major, each declaring its own compliancy | [`integrations/prestashop`](integrations/prestashop) | `php -l` clean per variant; vendored clients proven identical to the PHP SDK. Runtime smoke test still owed — staging first. |
-| OpenCart | **3.0.x and 4.x** — separate builds (different platform conventions) | [`integrations/opencart`](integrations/opencart) | `php -l` clean per variant; vendored clients proven identical to the PHP SDK. Runtime smoke test still owed — staging first. |
+| WordPress / WooCommerce | WP 6.0+, WooCommerce 7.0 – 11.2 (HPOS + legacy storage; Checkout Blocks + classic) — one plugin | [`integrations/wordpress`](integrations/wordpress) | Unit tests (client, reconciler, Blocks integration) + live-API protocol proof passed. **Install-tested PASS 2026-10-26** on WordPress 7.1.3 + WooCommerce 11.2.1 (HPOS; Blocks + classic checkouts paid end-to-end). |
+| Odoo | **16.0, 17.0, 18.0, 19.0, 20.0** — one module per major | [`integrations/odoo`](integrations/odoo) | 14 client tests green per variant; clients byte-identical across variants; live-API protocol proof passed (17.0). **Install-tested PASS 2026-10-26 on all five versions** (genuine checkouts settled via signed webhooks; 20.0 also via the reconcile cron). |
+| Magento 2 | **2.4.6 – 2.4.9** — one module, Composer-ranged (`magento/framework 103.0.*`, PHP ^8.1) | [`integrations/magento`](integrations/magento) | `php -l` clean; vendored client proven identical to the PHP SDK. **Install-tested PASS 2026-10-26 on Magento 2.4.8** (genuine checkout → webhook capture → processing, exactly once). |
+| PrestaShop | **1.7, 8.x, 9.x** — one build per major, each declaring its own compliancy | [`integrations/prestashop`](integrations/prestashop) | `php -l` clean per variant; vendored clients proven identical to the PHP SDK. **Install-tested PASS 2026-10-26** on 9.0.0 / 8.1.7 / 1.7.8.11. |
+| OpenCart | **3.0.x and 4.x** — separate builds (different platform conventions) | [`integrations/opencart`](integrations/opencart) | `php -l` clean per variant; vendored clients proven identical to the PHP SDK. **Install-tested PASS 2026-10-26** on 9.0.0 / 8.1.7 / 1.7.8.11. |
 | Universal embed button (any website, incl. Wix / Squarespace / Webflow) | — | [`integrations/embed`](integrations/embed) | DOM tests pass. Binds to a public payment link only — the script refuses raw API keys. |
 | Zapier / Make automation pack | — | [`integrations/automation`](integrations/automation) | Webhook-first recipes using the platforms' native modules. No app-store listing exists. The Zapier app definition included is a **draft, unsubmitted**. |
 | Shopify | — | [`integrations/shopify/ASSESSMENT.md`](integrations/shopify/ASSESSMENT.md) | **Assessment only — no plugin.** Shopify checkout payments are gated by Shopify's payments partner programme. Payment links and the embed button work in Shopify today; the document explains the routes honestly. |
@@ -60,9 +60,10 @@ proves every PHP connector variant's vendored API client is identical to the PHP
 - Amounts and currencies are never silently converted: a connector refuses a
   store currency that has no matching BMaGlass Pay wallet (ZMW / USD) instead
   of improvising an exchange rate.
-- Connector proofs are lint + unit tests + documentation-verified
-  adaptation; no stack runtime exists in the build environment, so no
-  install-level proof is claimed (see VERSIONS.md).
+- Connector proofs: lint + unit tests + documentation-verified
+  adaptation, and — since 2026-10-26 — install-level proof on the
+  exact versions named in VERSIONS.md (genuine checkouts on real
+  installs of every stack, paid via the live API).
 
 ## Licence
 

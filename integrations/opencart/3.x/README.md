@@ -47,7 +47,7 @@ line is still maintained upstream). For OpenCart 4.x use
 
 `php -l` clean on every file; the vendored client is
 byte-identical to the PHP SDK client whose live-API protocol
-proof passed in the original programme. **No OpenCart runtime
-exists in the build environment** — install-level behaviour is
-written to the documented 3.0.x extension conventions and not
-install-proven. Smoke-test on staging first.
+proof passed in the original programme. Install-level behaviour
+was written to the documented 3.0.x extension conventions and is
+now **install-tested PASS on OpenCart 3.0.5.1 (2026-10-26)** —
+genuine guest checkout → signed webhook settlement, exactly once.

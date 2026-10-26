@@ -51,7 +51,4 @@ repo's [`VERSIONS.md`](../../../VERSIONS.md).
 - The same client was run against the **live** developer API in the
   original 17.0 proof (QA merchant, live key: wallets read, link
   created, webhook delivered).
-- **No Odoo runtime was available in the build environment** (no
-  PostgreSQL), so install-level behaviour is docs-verified against
-  the Odoo 17.0 payment-framework reference, not install-proven.
-  Smoke-test on a staging instance first.
+- **Install-tested 2026-10-26 on Odoo 17.0: PASS** — genuine website checkout → hosted pay page → signed webhook settlement (tx done), duplicates idempotent, bad signatures refused. Sale-order confirmation after `done` is Odoo core post-processing.

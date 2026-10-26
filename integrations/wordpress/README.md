@@ -114,8 +114,7 @@ from it directly and reconciliation remains as the safety net.
   live key): wallets read, payment link created and re-fetched,
   webhook registered and test event delivered (see the connectors
   addendum in the completion-sweep goal for the dated record).
-- A full WordPress + WooCommerce runtime install was not available
-  in the build sandbox (no MySQL), so gateway-in-WordPress behaviour
-  is verified against the WooCommerce gateway/Blocks APIs plus the
-  executable proofs above — stated plainly rather than claimed.
-  Smoke-test on staging first.
+- **Install-tested 2026-10-26 on WordPress 7.1.3 + WooCommerce
+  11.2.1 (HPOS): PASS** — Blocks and classic checkouts both paid
+  end-to-end via signed webhook push; duplicate deliveries settle
+  exactly once; an unsupported currency is refused truthfully.
