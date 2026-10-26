@@ -53,6 +53,19 @@ class PaymentProvider(models.Model):
             return currencies & allowed
         return currencies
 
+    def _get_default_payment_method_codes(self):
+        """Override of `payment` to return the default payment method codes.
+
+        Core activates a provider's default methods when the provider is
+        enabled; the base implementation returns an empty list, so
+        without this override the BMaGlass method stays archived and the
+        provider never renders at checkout (install-test finding B4).
+        """
+        default_codes = super()._get_default_payment_method_codes()
+        if self.code != "bmaglass":
+            return default_codes
+        return ["bmaglass"]
+
     @api.constrains("state", "bmaglass_api_key")
     def _check_bmaglass_enabled_needs_live_key(self):
         """Honest test mode: enabling payments requires a live key.
