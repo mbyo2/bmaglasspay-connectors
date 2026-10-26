@@ -50,8 +50,11 @@ class Bmaglasspay extends \Opencart\System\Engine\Controller
                 $json['redirect'] = Client::paymentLinkUrl($row['link_code']);
             } else {
                 try {
+                    // apiClient() performs the SDK require_once; it must
+                    // run BEFORE any Client:: static call (B17).
+                    $client = $this->apiClient();
                     $currency = Client::assertSupportedCurrency($order['currency_code']);
-                    $link = $this->apiClient()->createPaymentLink(
+                    $link = $client->createPaymentLink(
                         'Order #' . $orderId,
                         (float) $order['total'],
                         $currency,
