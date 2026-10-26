@@ -9,6 +9,7 @@
              until an admin enables it with a live key — the same
              out-of-box behaviour as the other variants. -->
         <field name="is_published">True</field>
+        <field name="available_currency_ids" eval="[(6, 0, [ref('base.ZMW'), ref('base.USD')])]"/>
         <field name="module_id" ref="base.module_payment_bmaglass"/>
         <field name="redirect_form_view_id" ref="payment_bmaglass.redirect_form"/>
         <field name="company_id" ref="base.main_company"/>
