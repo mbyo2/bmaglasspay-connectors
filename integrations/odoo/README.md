@@ -32,9 +32,7 @@ Full landscape and sources: [`VERSIONS.md`](../../VERSIONS.md).
   Exactly-once on both paths.
 - **ZMW / USD only** and **live key required to take payments** —
   test keys are read-only platform-wide (no test-mode ledger), and
-  no exchange rate is ever invented. The provider record declares
-  ZMW + USD in `available_currency_ids`, so Odoo only offers the
-  method for supported shop currencies (B9, docs cross-check).
+  no exchange rate is ever invented.
 - The vendored API client (`models/bmaglass_api.py`) is
   **byte-identical across all five variants** — verified by
   [`check-clients.sh`](check-clients.sh) — and mirrors the Python
