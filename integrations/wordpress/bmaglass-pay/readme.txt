@@ -4,7 +4,7 @@ Tags: payments, woocommerce, bmaglass, zambia, kwacha
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPLv2 or later
 
 Accept BMaGlass Pay payments in WooCommerce. Buyers pay wallet-to-wallet on a hosted BMaGlass payment page; money lands in the same BMaGlass wallets (ZMW / USD) as your BMaGlass Pay app account.
@@ -54,6 +54,9 @@ BMaGlass tells it: the signed payment_link.paid webhook fires when the payment l
 Payment-link settlement follows your BMaGlass Pay account's standard link settlement terms (shown in the app). The plugin adds no fees of its own.
 
 == Changelog ==
+
+= 1.1.1 =
+* Fix: re-registering the webhook now retires the previous registration first, so a site migration no longer leaves the old webhook active on the BMaGlass account (every event would otherwise be delivered to the stale URL as well). Found in install-level testing (WordPress 7.1 / WooCommerce 11.2).
 
 = 1.1.0 =
 * Checkout Blocks support: the gateway now registers a Blocks payment method type, so it appears in the Cart/Checkout block checkout (default since WooCommerce 10.6) as well as classic checkout. Server-side processing is unchanged — the block routes to the same process_payment().

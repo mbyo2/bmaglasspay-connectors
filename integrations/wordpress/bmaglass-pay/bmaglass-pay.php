@@ -3,7 +3,7 @@
  * Plugin Name:       BMaGlass Pay for WooCommerce
  * Plugin URI:        https://bmaglasspay.online/developers
  * Description:       Accept BMaGlass Pay payments in WooCommerce — buyers pay wallet-to-wallet on a hosted BMaGlass payment page, and the money lands in the same BMaGlass wallets (ZMW / USD) as your app account. Built on the BMaGlass Pay developer API.
- * Version:           1.1.0
+ * Version:           1.1.1
  * Author:            BMaGlass Pay
  * License:           GPL-2.0-or-later
  * Text Domain:       bmaglass-pay
@@ -287,11 +287,21 @@ add_action('admin_post_bmaglass_register_webhook', function () {
         bmaglass_admin_redirect('Save a BMaGlass API key first, then register the webhook.', 'error');
     }
     try {
+        $s = bmaglass_settings();
+        // Retire any previous registration first: re-registering (e.g. after a
+        // site migration) must not leave the old webhook active on the account,
+        // or every event would be delivered to the stale URL as well.
+        if (!empty($s['webhook_id'])) {
+            try {
+                $client->deleteWebhook($s['webhook_id']);
+            } catch (BMaGlassApiException $e) {
+                // Best-effort cleanup; never block the new registration on it.
+            }
+        }
         $hook = $client->createWebhook(
             rest_url('bmaglass/v1/webhook'),
             array('transaction.completed', 'payment_link.created', 'payment_link.paid', 'webhook.test')
         );
-        $s = bmaglass_settings();
         $s['webhook_id'] = isset($hook['id']) ? $hook['id'] : '';
         if (!empty($hook['secret'])) {
             // The secret is returned exactly once — store it now.
