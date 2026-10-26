@@ -188,12 +188,15 @@ class BMaGlassClient:
                 0, "network_error",
                 "Couldn't reach BMaGlass Pay. Check the connection and try again. (%s)" % e.reason,
             )
-        except (ConnectionError, TimeoutError, http.client.HTTPException) as e:
+        except (OSError, http.client.HTTPException, ValueError) as e:
             # http.client.RemoteDisconnected & friends are NOT URLError
-            # subclasses — left unmapped they escaped as raw exceptions
-            # and crashed callers that (correctly) only expect
-            # BMaGlassError, e.g. the webhook register action after the
-            # webhook had already been created (install-test finding B3).
+            # subclasses — and a connection cut mid-body surfaces as
+            # OSError or even a bare ValueError from chunked decoding —
+            # left unmapped they escaped as raw exceptions and crashed
+            # callers that (correctly) only expect BMaGlassError, e.g.
+            # the webhook register action after the webhook had already
+            # been created (install-test findings B3/B3b). A transport
+            # failure to complete the exchange IS a network error.
             raise BMaGlassError(
                 0, "network_error",
                 "Couldn't reach BMaGlass Pay. Check the connection and try again. (%s)" % e,
