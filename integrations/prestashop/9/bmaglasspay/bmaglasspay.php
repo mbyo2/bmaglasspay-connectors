@@ -41,7 +41,7 @@ class Bmaglasspay extends PaymentModule
         $this->tab = 'payments_gateways';
         $this->version = '1.0.0';
         $this->author = 'BMaGlass Pay';
-        $this->ps_versions_compliancy = array('min' => '9.0.0.0', 'max' => '9.9999.9999');
+        $this->ps_versions_compliancy = array('min' => '9.0.0', 'max' => '9.9999.9999');
         $this->is_eu_compatible = 1;
         $this->bootstrap = true;
         parent::__construct();
