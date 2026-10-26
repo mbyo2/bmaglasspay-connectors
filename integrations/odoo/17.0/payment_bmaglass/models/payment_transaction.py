@@ -56,6 +56,17 @@ class PaymentTransaction(models.Model):
             res["bmaglass_link_code"] = self.bmaglass_link_code
         return res
 
+    def _bmaglass_log(self, message):
+        """Post a settlement note on the transaction's chatter.
+
+        `_log_message_on_transaction` does not exist on
+        payment.transaction in this Odoo version (install-test B5:
+        calling it raised AttributeError mid-settlement and rolled the
+        whole webhook request back), so mail.thread's message_post —
+        available in every Odoo version — is used instead.
+        """
+        self.message_post(body=message)
+
     # -- settlement: webhook first, reconciliation as fallback --------------
     def _bmaglass_settle_from_paid_event(self, data):
         """Settle this transaction from a verified payment_link.paid event.
@@ -80,7 +91,7 @@ class PaymentTransaction(models.Model):
                 "BMaGlass payment_link.paid declined for %s: %s", self.reference, reason)
             return False
         self._set_done()
-        self._log_message_on_transaction(
+        self._bmaglass_log(
             "BMaGlass Pay payment confirmed by webhook (payment_link.paid) — link %s, %s %s."
             % (self.bmaglass_link_code, "{:,.2f}".format(float(data.get("amount"))),
                self.currency_id.name)
@@ -110,7 +121,7 @@ class PaymentTransaction(models.Model):
             collected = float(link.get("total_collected") or 0.0)
             if count > 0 and collected + 0.009 >= float(self.amount):
                 self._set_done()
-                self._log_message_on_transaction(
+                self._bmaglass_log(
                     "BMaGlass Pay payment confirmed by reconciliation — link %s, collected %s %s."
                     % (self.bmaglass_link_code, "{:,.2f}".format(collected), self.currency_id.name)
                 )

@@ -60,9 +60,10 @@ class PaymentTransaction(models.Model):
     def _bmaglass_log(self, message):
         """Post a settlement note on the transaction's chatter.
 
-        Odoo 19.0's documented payment.transaction API drops
-        `_log_message_on_transaction` (present in 17.0/18.0) as part
-        of the 19.0 payment-processing rework, so
+        `_log_message_on_transaction` does not exist on
+        payment.transaction in any of 16.0-19.0 (install-test B5 proved
+        it live on 17.0; the earlier note claiming it was present in
+        17.0/18.0 was wrong), so
         mail.thread's message_post — available in every Odoo version —
         is used instead.
         """
