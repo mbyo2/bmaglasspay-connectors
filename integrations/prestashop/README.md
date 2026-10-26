@@ -1,50 +1,55 @@
-# BMaGlass Pay for PrestaShop
+# BMaGlass Pay for PrestaShop — per-version modules
 
-Accept BMaGlass Pay in PrestaShop 1.7+ / 8.x. Buyers pay on
-BMaGlass's hosted payment page from their BMaGlass wallet; the money
-lands in the **same BMaGlass account and wallets**. The API client
-is the PHP SDK (`sdk/php`), vendored **verbatim** in
+Accept BMaGlass Pay in PrestaShop. Buyers pay on BMaGlass's hosted
+payment page from their BMaGlass wallet; the money lands in the
+**same BMaGlass account and wallets**. The API client is the PHP
+SDK (`sdk/php`), vendored **verbatim** in each variant's
 `bmaglasspay/classes/sdk/` (byte-identical — verified by
 `integrations/check-vendored-clients.sh`).
 
-## How it works
+One build per PrestaShop major — pick yours:
+
+| Folder | PrestaShop | PHP | Upstream status (Oct 2026) |
+|---|---|---|---|
+| [`1.7/`](1.7/) | 1.7.x | 7.2–7.4 | EOL Feb 2026; very large installed base |
+| [`8/`](8/) | 8.x (8.2.x) | 7.2.5–8.1 | Security fixes until PrestaShop 10 |
+| [`9/`](9/) | 9.x (9.2) | 8.1–8.5 | Current (Symfony 6.4 core) |
+
+Full landscape and sources: [`VERSIONS.md`](../../VERSIONS.md).
+
+## Shared behaviour (every variant)
 
 - Checkout (live key + ZMW/USD store currency only; otherwise the
   option hides rather than faking a sandbox or inventing an FX
   rate): the order is created in "Awaiting BMaGlass payment", one
   payment link is created for the exact total, and the buyer is
   redirected to the hosted page.
-- Settlement: the HMAC-verified webhook (module controller
-  `webhook`) settles immediately on `payment_link.paid` — the paid
-  link's order is confirmed via the API and marked paid; the module
-  also reconciles from the configuration page ("Check pending
-  orders") as the fallback. Paid links mark orders paid
-  **exactly once**.
+- Settlement is **push-first**: the HMAC-verified webhook settles
+  immediately on `payment_link.paid` (the paid link's order is
+  confirmed via the API and marked paid); the module configuration
+  page's "Check pending orders" reconciliation is the fallback.
+  Orders complete **exactly once**.
+- Wallet-to-wallet only (buyers need a BMaGlass account). Test
+  keys are read-only by design: connection checks only.
+- PrestaShop has no built-in cron: for hands-off operation, hit
+  the module's reconcile action from your server cron, or rely on
+  webhooks + normal admin visits.
 
-## Install
+## What actually differs between variants
 
-1. Zip the `bmaglasspay/` folder and install it via **Modules →
-   Module Manager → Upload a module** (or copy it to `modules/`).
-2. Configure: paste your API key; register the webhook URL shown in
-   the module settings in BMaGlass Pay and paste the signing secret
-   shown once; use **Test connection** to see your wallets.
-3. Keep the store currency ZMW or USD where BMaGlass should appear.
-
-## Honest limits
-
-- Wallet-to-wallet only (buyers need a BMaGlass account).
-- Test keys are read-only by design: connection checks only.
-- Settlement is normally instant (the `payment_link.paid` webhook).
-  If a delivery is missed, the fallback reconciliation can leave a
-  short delay between the buyer paying and the order flipping to
-  paid. PrestaShop has no built-in cron: for hands-off operation,
-  hit the module's reconcile action from your server cron via the
-  configuration page, or rely on webhooks + the shop's normal
-  admin visits.
+The payment API used (`paymentOptions` hook,
+`ModuleFrontController`, `validateOrder`) is the documented
+integration surface on all three majors — the logic is shared.
+What genuinely splits is the **declared platform**: each build
+declares its own `ps_versions_compliancy` (previously undeclared),
+its PHP floor, and the 9.x build adds a module `composer.json`
+with a PHP >= 8.1 requirement matching PrestaShop 9's Symfony 6.4
+platform. Per-variant details are in each folder's README.
 
 ## Verification status
 
-`php -l` clean on every file; the vendored client is byte-identical
-to the PHP SDK client whose live-API protocol proof passed in the
-connectors mission. A full PrestaShop runtime install was not
-available in the build sandbox — smoke-test on staging first.
+`php -l` clean on every file in every variant; vendored clients
+byte-identical to the PHP SDK client, whose live-API protocol
+proof passed in the original programme. **No PrestaShop runtime
+exists in the build environment** — install-level behaviour is
+docs-verified, not install-proven. Smoke-test on staging first.

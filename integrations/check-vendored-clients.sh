@@ -3,7 +3,8 @@
 # SDK client — byte-identical where the platform allows the
 # BMaGlass\Sdk namespace, equal-after-namespace-normalisation where
 # the platform's autoloader dictates its own namespace (Magento).
-# This is the "client-level reuse proof" for the PHP connectors.
+# Covers every per-version variant. This is the "client-level
+# reuse proof" for the PHP connectors.
 set -u
 cd "$(dirname "$0")/.."
 fail=0
@@ -29,8 +30,11 @@ check_namespaced() {
 # unit tests + the live protocol proof instead.
 
 for f in Client.php ApiException.php; do
-    check_verbatim integrations/prestashop/bmaglasspay/classes/sdk "$f"
-    check_verbatim integrations/opencart/upload/system/library/bmaglass "$f"
+    for v in 1.7 8 9; do
+        check_verbatim "integrations/prestashop/$v/bmaglasspay/classes/sdk" "$f"
+    done
+    check_verbatim integrations/opencart/4.x/upload/system/library/bmaglass "$f"
+    check_verbatim integrations/opencart/3.x/upload/system/library/bmaglass "$f"
     check_namespaced integrations/magento/BMaGlass/Pay/Model/Api "$f"
 done
 

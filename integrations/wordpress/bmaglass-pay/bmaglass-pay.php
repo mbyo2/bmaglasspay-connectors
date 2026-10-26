@@ -3,14 +3,14 @@
  * Plugin Name:       BMaGlass Pay for WooCommerce
  * Plugin URI:        https://bmaglasspay.online/developers
  * Description:       Accept BMaGlass Pay payments in WooCommerce — buyers pay wallet-to-wallet on a hosted BMaGlass payment page, and the money lands in the same BMaGlass wallets (ZMW / USD) as your app account. Built on the BMaGlass Pay developer API.
- * Version:           1.0.0
+ * Version:           1.1.0
  * Author:            BMaGlass Pay
  * License:           GPL-2.0-or-later
  * Text Domain:       bmaglass-pay
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * WC requires at least: 7.0
- * WC tested up to:   9.3
+ * WC tested up to:   11.2
  *
  * How settlement is confirmed: the developer API fires a signed
  * payment_link.paid webhook the moment a payment link is paid, and
@@ -25,7 +25,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('BMAGLASS_PAY_VERSION', '1.0.0');
+define('BMAGLASS_PAY_VERSION', '1.1.0');
 define('BMAGLASS_PAY_DIR', plugin_dir_path(__FILE__));
 
 require_once BMAGLASS_PAY_DIR . 'includes/class-bmaglass-api-client.php';
@@ -52,6 +52,43 @@ function bmaglass_client_from_settings()
         return null;
     }
 }
+
+// ── WooCommerce feature compatibility (HPOS + Checkout Blocks) ──────
+// Declared the documented way, before WooCommerce initialises: the
+// gateway and reconciler use only CRUD order APIs and order meta
+// (wc_get_order / wc_get_orders / get_meta / update_meta_data), which
+// is the HPOS-safe surface — no direct postmeta or wp_posts access —
+// and the checkout-block integration below registers the gateway for
+// the Cart/Checkout blocks (the default checkout since WC 10.6).
+add_action('before_woocommerce_init', function () {
+    if (class_exists('\Automattic\WooCommerce\Utilities\FeaturesUtil')) {
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('cart_checkout_blocks', __FILE__, true);
+    }
+});
+
+// ── Checkout Blocks integration ─────────────────────────────────────
+// Registers the gateway as a Blocks payment method type; without
+// this the gateway is invisible in the block checkout. The block
+// collects no fields — WooCommerce routes the submission to the
+// gateway's classic process_payment() server-side.
+add_action('woocommerce_blocks_payment_method_type_registration', function ($registry) {
+    if (!class_exists('Automattic\\WooCommerce\\Blocks\\Payments\\Integrations\\AbstractPaymentMethodType')) {
+        return;
+    }
+    require_once BMAGLASS_PAY_DIR . 'includes/class-bmaglass-blocks-integration.php';
+    $registry->register(new BMaGlass_Blocks_Integration());
+});
+
+add_action('init', function () {
+    wp_register_script(
+        'bmaglass-blocks-integration',
+        plugins_url('assets/js/blocks-integration.js', __FILE__),
+        array('wc-blocks-registry', 'wc-settings', 'wp-element'),
+        BMAGLASS_PAY_VERSION,
+        true
+    );
+});
 
 // ── Gateway registration ─────────────────────────────────────────────
 add_filter('woocommerce_payment_gateways', function ($gateways) {

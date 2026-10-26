@@ -1,0 +1,1 @@
+{"description":"BMaGlass Pay payment module for PrestaShop 9.x — hosted payment-link checkout (ZMW/USD), payment_link.paid push settlement with reconciliation fallback.","license":"MIT","name":"bmaglass/bmaglasspay-prestashop","require":{"php":">=8.1"},"type":"prestashop-module"}

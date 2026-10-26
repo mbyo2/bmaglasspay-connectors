@@ -4,18 +4,45 @@ A WooCommerce payment gateway that connects a WordPress store to the
 merchant's existing BMaGlass Pay account — **same account, same
 wallets (ZMW / USD)** — through the BMaGlass Pay developer API.
 
+**One plugin covers the current WooCommerce range** — that is the
+industry pattern for WooCommerce, and here the compatibility work
+behind the claim is real (below). Declared range: **WordPress 6.0+,
+WooCommerce 7.0 – 11.2** (11.2.1 is the current release, Oct 2026),
+**PHP 7.4+**. Both order storages and both checkouts are supported:
+
+- **HPOS and legacy order storage.** The gateway and reconciler use
+  only WooCommerce CRUD order APIs and order meta (`wc_get_order`,
+  `wc_get_orders` with meta queries, `get_meta` / `update_meta_data`,
+  `payment_complete`) — the HPOS-safe surface, no direct post or
+  postmeta access — and the plugin declares `custom_order_tables`
+  compatibility via `FeaturesUtil` on `before_woocommerce_init`.
+- **Checkout Blocks and classic checkout.** Since WooCommerce 10.6
+  the Cart/Checkout blocks are the default checkout, and a classic
+  gateway alone is invisible there — so the plugin also registers a
+  Blocks payment method type
+  (`includes/class-bmaglass-blocks-integration.php` +
+  `assets/js/blocks-integration.js`) and declares
+  `cart_checkout_blocks` compatibility. The block collects no fields
+  (hosted-page flow); WooCommerce routes the submission to the same
+  `process_payment()` server-side, so every refusal and guard lives
+  in one place for both checkouts.
+
 ## Layout
 
 ```
 bmaglass-pay/
-  bmaglass-pay.php                       bootstrap: gateway registration, webhook route, cron, admin actions
+  bmaglass-pay.php                       bootstrap: gateway registration, compatibility declarations, Blocks registration, webhook route, cron, admin actions
   includes/class-bmaglass-api-client.php framework-free developer-API client (seed of sdk/php)
   includes/class-wc-gateway-bmaglass.php WC_Payment_Gateway implementation
   includes/class-bmaglass-reconciler.php settlement reconciliation (cron / thank-you / order action)
+  includes/class-bmaglass-blocks-integration.php  Checkout Blocks payment method type
+  assets/js/blocks-integration.js        Blocks registration script (no build step)
   uninstall.php                          removes settings (API key + webhook secret) and the cron schedule
   readme.txt                             WordPress plugin readme
 tests/
   run-client-tests.php                   standalone PHP tests for the API client (no WordPress needed)
+  run-reconciler-tests.php               settlement logic tests (webhook path + polling fallback)
+  run-blocks-tests.php                   Blocks integration tests (stubbed Blocks base class)
 ```
 
 ## Install
@@ -70,11 +97,18 @@ from it directly and reconciliation remains as the safety net.
 
 ## Verification in this repo
 
-- `php -l` clean on all five PHP files.
+- `php -l` clean on all PHP files; the Blocks script passes
+  `node --check`.
 - `tests/run-client-tests.php` (PHP CLI, stub transport): mode
   detection, header/body shaping, typed error mapping incl.
   `test_mode_read_only`, currency guard, and the shared cross-SDK
   HMAC known-answer vector.
+- `tests/run-reconciler-tests.php`: the `payment_link.paid` webhook
+  path and the polling fallback, incl. no-double-complete races.
+- `tests/run-blocks-tests.php`: the Blocks integration — name,
+  availability mirroring the classic gateway, payment-method data,
+  script handle — plus source pins for the HPOS/Blocks
+  compatibility declarations in the bootstrap.
 - Live protocol proof: the plugin's own client class was run from
   PHP CLI against the production developer API (QA merchant account,
   live key): wallets read, payment link created and re-fetched,
@@ -82,6 +116,6 @@ from it directly and reconciliation remains as the safety net.
   addendum in the completion-sweep goal for the dated record).
 - A full WordPress + WooCommerce runtime install was not available
   in the build sandbox (no MySQL), so gateway-in-WordPress behaviour
-  is verified by code review against the WooCommerce gateway API
-  plus the executable client proofs above — stated plainly rather
-  than claimed.
+  is verified against the WooCommerce gateway/Blocks APIs plus the
+  executable proofs above — stated plainly rather than claimed.
+  Smoke-test on staging first.

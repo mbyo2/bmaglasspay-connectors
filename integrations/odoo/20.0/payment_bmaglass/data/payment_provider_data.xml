@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="payment_provider_bmaglass" model="payment.provider">
+        <field name="name">BMaGlass Pay</field>
+        <field name="code">bmaglass</field>
+        <!-- No state value is set on purpose: Odoo 20 reworked the
+             provider's state handling, so the record takes the
+             version's own default and starts unpublished/disabled
+             until an admin enables it with a live key — the same
+             out-of-box behaviour as the other variants. -->
+        <field name="module_id" ref="base.module_payment_bmaglass"/>
+        <field name="redirect_form_view_id" ref="payment_bmaglass.redirect_form"/>
+        <field name="company_id" ref="base.main_company"/>
+    </record>
+</odoo>

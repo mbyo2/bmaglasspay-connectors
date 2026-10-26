@@ -1,46 +1,36 @@
-# BMaGlass Pay for OpenCart 4
+# BMaGlass Pay for OpenCart — per-version extensions
 
-Accept BMaGlass Pay in OpenCart 4.x. Buyers pay on BMaGlass's
-hosted payment page from their BMaGlass wallet; the money lands in
-the **same BMaGlass account and wallets**. The API client is the
-PHP SDK (`sdk/php`), vendored **verbatim** under
+Accept BMaGlass Pay in OpenCart. Buyers pay on BMaGlass's hosted
+payment page from their BMaGlass wallet; the money lands in the
+**same BMaGlass account and wallets**. The API client is the PHP
+SDK (`sdk/php`), vendored **verbatim** under each variant's
 `upload/system/library/bmaglass/` (byte-identical — verified by
 `integrations/check-vendored-clients.sh`).
 
-## How it works
+OpenCart 3.x and 4.x are **genuinely different platforms** (3.x:
+classic `ControllerExtensionPayment*` classes, `getMethod()` model
+signature, `extension/payment/...` routes; 4.x: namespaced
+extension modules, `getMethods()`, the extension-folder layout), so
+each has its own build:
+
+| Folder | OpenCart | Upstream status (Oct 2026) |
+|---|---|---|
+| [`3.x/`](3.x/) | 3.0.x (3.0.5.1) | Still maintained (3.0.5.1, Aug 2026) |
+| [`4.x/`](4.x/) | 4.x (4.1.0.4) | Current |
+
+Full landscape and sources: [`VERSIONS.md`](../../VERSIONS.md).
+
+## Shared behaviour (both builds)
 
 - Checkout (enabled + live key + ZMW/USD store currency only):
   confirm creates ONE payment link per order and redirects the
   buyer to the hosted page.
-- Settlement: the HMAC-verified callback receives
+- Settlement is **push-first**: the HMAC-verified callback receives
   `payment_link.paid` and reconciles that order immediately
-  (`GET /payment-links` matched to the stored per-order link code,
-  confirmed via the API); the polling reconciliation remains as
-  the fallback. Paid orders flip to the configured paid status
-  **exactly once**.
+  (confirmed via the API); polling reconciliation is the fallback.
+  Orders complete **exactly once**.
+- Wallet-to-wallet only (buyers need a BMaGlass account); test
+  keys are read-only by design — connection check only.
 
-## Install
-
-1. Copy the contents of `upload/` over your OpenCart root
-   (or zip `upload/` as an extension archive and install via
-   **Extensions → Installer**).
-2. **Extensions → Extensions → Payments → BMaGlass Pay → Install**,
-   then Edit: enable, paste your API key, use **Test connection**
-   to see your wallets, register the shown webhook URL in
-   BMaGlass Pay and paste the signing secret shown once, and pick
-   the paid order status.
-3. Keep the store currency ZMW or USD where BMaGlass should appear
-   (other currencies hide the method — no invented FX rate).
-
-## Honest limits
-
-- Wallet-to-wallet only (buyers need a BMaGlass account).
-- Test keys are read-only by design: connection check only;
-  checkout requires a live key.
-
-## Verification status
-
-`php -l` clean on every file; the vendored client is byte-identical
-to the PHP SDK client whose live-API protocol proof passed in the
-connectors mission. A full OpenCart runtime install was not
-available in the build sandbox — smoke-test on staging first.
+Per-version install steps and the exact platform differences are
+in each folder's README.
