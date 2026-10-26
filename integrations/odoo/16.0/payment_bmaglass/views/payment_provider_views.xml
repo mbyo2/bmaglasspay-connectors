@@ -7,12 +7,12 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='state']" position="after">
                 <field name="bmaglass_api_key" password="True"
-                       invisible="code != 'bmaglass'"/>
+                       attrs="{'invisible': [('code', '!=', 'bmaglass')]}"/>
                 <field name="bmaglass_webhook_id"
-                       invisible="code != 'bmaglass'"/>
+                       attrs="{'invisible': [('code', '!=', 'bmaglass')]}"/>
                 <field name="bmaglass_webhook_secret" password="True"
-                       invisible="code != 'bmaglass'"/>
-                <div invisible="code != 'bmaglass'">
+                       attrs="{'invisible': [('code', '!=', 'bmaglass')]}"/>
+                <div attrs="{'invisible': [('code', '!=', 'bmaglass')]}">
                     <button name="action_bmaglass_test_connection" type="object"
                             class="btn-secondary" string="Test connection"/>
                     <button name="action_bmaglass_register_webhook" type="object"
