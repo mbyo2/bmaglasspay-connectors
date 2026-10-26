@@ -43,21 +43,28 @@ Full landscape and sources: [`VERSIONS.md`](../../VERSIONS.md).
 
 - **16.0**: no `_get_supported_currencies` and no
   `_log_message_on_transaction` in the documented API — the
-  currency allowlist is enforced at transaction creation and
-  settlement notes use `message_post()`.
+  currency allowlist is enforced at transaction creation.
 - **17.0 / 18.0**: the documented payment API this module uses is
   the same in both (verified page-by-page); the variants differ in
   manifest version and install docs, honestly, rather than in
   invented code changes.
 - **19.0**: the payment-processing rework (notification API renamed
-  to `_search_by_reference` / `_process` / `_apply_updates`) and
-  `_log_message_on_transaction` dropped — settlement notes use
-  `message_post()`; the module's own controller/cron settlement is
-  unaffected by the rename.
+  to `_search_by_reference` / `_process` / `_apply_updates`); the
+  module's own controller/cron settlement is unaffected by the
+  rename.
 - **20.0**: the provider state rework — nothing in the variant
   reads/writes a provider `state` value: the live-key rule is
   enforced at payment-link creation, the form anchors after `code`,
   and the data record takes the version's own state default.
+  Default-method activation uses core's `setup_provider()` from a
+  `post_init_hook` (B11 — 20 has no state transition to trigger it),
+  config parameters use the typed `get_str`/`set_str` accessors
+  (B8), and access rules ship as `security/ir.access.csv` (B6).
+- **All variants**: settlement notes go through one crash-proof
+  `_bmaglass_log` helper (`_log_message_on_linked_documents` →
+  `message_post` → server log; logging can never block settlement —
+  B5/B5b), and the supported-currency search ignores active flags
+  so a currency activated after install is still declared (B10).
 
 ## Verification (all variants)
 

@@ -51,7 +51,7 @@ class PaymentProvider(models.Model):
         """BMaGlass wallets are ZMW and USD — never anything else."""
         currencies = super()._get_supported_currencies()
         if self.code == "bmaglass":
-            allowed = self.env["res.currency"].search([("name", "in", ["ZMW", "USD"])])
+            allowed = self.env["res.currency"].with_context(active_test=False).search([("name", "in", ["ZMW", "USD"])])
             return currencies & allowed
         return currencies
 
