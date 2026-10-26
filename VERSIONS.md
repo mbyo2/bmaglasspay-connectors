@@ -7,16 +7,24 @@ version is listed as supported only when a build for it exists in
 this repository, adapted to that version's documented framework
 APIs. Anything excluded says why.
 
-**Proof boundary (applies to every row):** no runtime for any of
-these stacks exists in the build environment (no WordPress/Odoo/
-Magento/PrestaShop/OpenCart installs, no MySQL/PostgreSQL). Proofs
-are therefore: syntax (`php -l` / `python3 -m compileall`) clean,
-shared client/unit tests green per variant, vendored-client
-identity checks, and adaptation verified against each version's
-official documentation. **Install-level proof is not claimed
-anywhere in this repo** — smoke-test on staging first. The BMaGlass
-API client in every variant was additionally run against the live
-developer API in the original connectors programme.
+**Proof boundary (updated 26 Oct 2026 — install-level testing):**
+the real stacks were installed and the connectors run through
+genuine shop checkouts paid via the live BMaGlass API (hosted pay
+page handoff, signed webhook settlement, exactly-once on duplicate
+delivery, truthful refusals). **Install-tested PASS:** WordPress
+7.1.3 + WooCommerce 11.2.1 (HPOS; Blocks + classic checkouts);
+Odoo 16.0 / 17.0 / 18.0 / 19.0 / 20.0 (20.0 proven on both the
+webhook-queue and reconcile settlement paths); PrestaShop 9.0.0 /
+8.1.7 / 1.7.8.11; OpenCart 4.1.0.4 / 3.0.5.1; Magento 2.4.8.
+25 connector bugs were found by the installs and fixed in this
+repo (B1–B25 in the mission buglog) — several were fatal on real
+installs (a repo-wide webhook-signature header typo, an encrypted
+Magento API key never decrypted at runtime, PrestaShop payment
+double-booking, Odoo 20's missing payment method + write-guard
+settlement). Versions inside a declared range that are NOT in the
+list above (e.g. Magento 2.4.6/2.4.7/2.4.9, PrestaShop 9.2, 8.2.x)
+remain documentation-adapted and syntax/unit-proven only —
+install proof is claimed for exactly the versions named here.
 
 ## Odoo — one module per major: `integrations/odoo/<version>/`
 
@@ -36,6 +44,14 @@ Odoo's supported-versions policy (three most recent majors).
 
 The vendored API client is byte-identical across all five builds
 (`integrations/odoo/check-clients.sh`).
+
+**Install-tested 2026-10-26: all five versions PASS** — module
+installs, provider activates, genuine website checkout creates the
+payment link for the exact order total, signed webhook delivery
+settles `payment_transaction.state = done`, duplicates are
+idempotent, bad signatures get 401. 20.0 additionally proven via
+the reconcile cron path. (Sale-order confirmation after `done` is
+Odoo core post-processing, outside the connector's contract.)
 
 ## WooCommerce (WordPress) — one plugin, declared range: `integrations/wordpress/`
 
@@ -57,6 +73,11 @@ compatibility work is real** — and here it is, not just declared:
   method type (`AbstractPaymentMethodType` + registration script)
   is implemented and unit-tested; the block routes server-side to
   the same `process_payment()`.
+- **Install-tested 2026-10-26: PASS** on WordPress 7.1.3 +
+  WooCommerce 11.2.1 (HPOS) — Blocks and classic checkouts both
+  paid end-to-end via signed webhook push; duplicate deliveries
+  settle exactly once; an unsupported currency (EUR) is refused
+  truthfully with no payment link created.
 
 ## Magento Open Source / Adobe Commerce — one module, Composer-ranged: `integrations/magento/`
 
@@ -66,7 +87,7 @@ policy (Oct 2026).
 | Magento | PHP | Adobe support | Build |
 |---|---|---|---|
 | 2.4.9 (May 2026) | 8.4 / 8.5 | → May 2029 | ✅ same module |
-| 2.4.8 | 8.3 / 8.4 | → May 2028 | ✅ same module |
+| 2.4.8 | 8.3 / 8.4 | → May 2028 | ✅ same module — **install-tested PASS 2026-10-26** (MySQL 8 + OpenSearch 2.19; genuine checkout → webhook capture → processing, exactly once) |
 | 2.4.7 | 8.2 / 8.3 | → May 2027 | ✅ same module |
 | 2.4.6 | 8.1 / 8.2 | extended → Aug 2027 | ✅ same module |
 | 2.4.5 and earlier | 8.1 only | **ended Aug 2026** | ❌ unsupported platform — upgrade the store |
@@ -90,9 +111,9 @@ until PrestaShop 10; 1.7.8 branches retired Feb 2026).
 
 | PrestaShop | PHP | Upstream status | Build |
 |---|---|---|---|
-| 9.x (9.2) | 8.1–8.5 (Symfony 6.4) | Current | ✅ `9/` — 9.x compliancy, module `composer.json` with PHP ≥ 8.1 floor |
-| 8.x (8.2.x) | 7.2.5–8.1 | Security fixes until PS 10 | ✅ `8/` — 8.x compliancy declared |
-| 1.7.x | 7.2–7.4 | EOL Feb 2026; huge installed base | ✅ `1.7/` — 1.7 compliancy declared |
+| 9.x (9.2) | 8.1–8.5 (Symfony 6.4) | Current | ✅ `9/` — **install-tested PASS on 9.0.0** 2026-10-26 (9.2 doc-adapted) |
+| 8.x (8.2.x) | 7.2.5–8.1 | Security fixes until PS 10 | ✅ `8/` — **install-tested PASS on 8.1.7** 2026-10-26 |
+| 1.7.x | 7.2–7.4 | EOL Feb 2026; huge installed base | ✅ `1.7/` — **install-tested PASS on 1.7.8.11** 2026-10-26 |
 
 The payment API used (`paymentOptions` hook,
 `ModuleFrontController`, `validateOrder`) is the documented
@@ -109,8 +130,8 @@ Sources: opencart.com downloads (4.1.0.4 and **3.0.5.1**, both
 
 | OpenCart | Build | Genuine adaptation |
 |---|---|---|
-| 4.x | ✅ `4.x/` | Namespaced extension layout, `getMethods()`, JSON admin save, 4.x template style |
-| 3.0.x | ✅ `3.x/` | Classic `ControllerExtensionPayment*` classes, `getMethod($address, $total)`, `extension/payment/...` routes, form-POST admin save, 3.x (Bootstrap 3) templates, `install.json` package |
+| 4.x | ✅ `4.x/` — **install-tested PASS on 4.1.0.4** 2026-10-26 | Namespaced extension layout, `getMethods()`, JSON admin save, 4.x template style |
+| 3.0.x | ✅ `3.x/` — **install-tested PASS on 3.0.5.1** 2026-10-26 | Classic `ControllerExtensionPayment*` classes, `getMethod($address, $total)`, `extension/payment/...` routes, form-POST admin save, 3.x (Bootstrap 3) templates, `install.json` package |
 
 These are separate builds because the platforms genuinely differ
 in class layout, routing, model signatures and admin conventions —
