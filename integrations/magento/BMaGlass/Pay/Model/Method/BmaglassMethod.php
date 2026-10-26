@@ -3,6 +3,7 @@
 namespace BMaGlass\Pay\Model\Method;
 
 use BMaGlass\Pay\Model\Api\Client;
+use BMaGlass\Pay\Model\Config;
 use Magento\Payment\Model\Method\AbstractMethod;
 
 /**
@@ -14,6 +15,9 @@ use Magento\Payment\Model\Method\AbstractMethod;
  */
 class BmaglassMethod extends AbstractMethod
 {
+    /** @var Config|null Lazily resolved (method models are built by core factories). */
+    private $bmaglassConfig;
+
     protected $_code = 'bmaglasspay';
     protected $_isGateway = true;
     protected $_canAuthorize = true;
@@ -31,7 +35,10 @@ class BmaglassMethod extends AbstractMethod
         if (!parent::isAvailable($quote)) {
             return false;
         }
-        $key = (string) $this->getConfigData('api_key');
+        if ($this->bmaglassConfig === null) {
+            $this->bmaglassConfig = \Magento\Framework\App\ObjectManager::getInstance()->get(Config::class);
+        }
+        $key = $this->bmaglassConfig->apiKey();
         if ($key === '' || strpos($key, 'bmp_live_') !== 0) {
             return false;
         }
@@ -64,6 +71,10 @@ class BmaglassMethod extends AbstractMethod
     /** After placement, checkout sends the buyer to our redirect controller. */
     public function getOrderPlaceRedirectUrl()
     {
-        return $this->_urlBuilder->getUrl('bmaglass/checkout/redirect', ['_secure' => true]);
+        // AbstractMethod carries no URL builder in Magento 2.4 — resolve
+        // the frontend URL interface directly.
+        $url = \Magento\Framework\App\ObjectManager::getInstance()
+            ->get(\Magento\Framework\UrlInterface::class);
+        return $url->getUrl('bmaglass/checkout/redirect', ['_secure' => true]);
     }
 }

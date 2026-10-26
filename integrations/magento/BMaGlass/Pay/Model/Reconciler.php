@@ -4,6 +4,7 @@ namespace BMaGlass\Pay\Model;
 
 use BMaGlass\Pay\Model\Api\ApiException;
 use BMaGlass\Pay\Model\Api\Client;
+use BMaGlass\Pay\Model\Config;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
@@ -26,22 +27,25 @@ class Reconciler
     private $collectionFactory;
     private $orderRepository;
     private $logger;
+    private $config;
 
     public function __construct(
         ScopeConfigInterface $scopeConfig,
         CollectionFactory $collectionFactory,
         OrderRepositoryInterface $orderRepository,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        Config $config = null
     ) {
         $this->scopeConfig = $scopeConfig;
         $this->collectionFactory = $collectionFactory;
         $this->orderRepository = $orderRepository;
         $this->logger = $logger;
+        $this->config = $config ?: \Magento\Framework\App\ObjectManager::getInstance()->get(Config::class);
     }
 
     public function client()
     {
-        $key = (string) $this->scopeConfig->getValue('payment/bmaglasspay/api_key');
+        $key = $this->config->apiKey();
         return $key !== '' ? new Client($key) : null;
     }
 
@@ -52,9 +56,11 @@ class Reconciler
         if ($client === null) {
             return 0;
         }
+        // Placed redirect-gateway orders sit in payment_review (pending
+        // transaction), not pending_payment — sweep both states, and let
+        // the link-code join below be the real selector.
         $orders = $this->collectionFactory->create()
-            ->addFieldToFilter('state', Order::STATE_PENDING_PAYMENT)
-            ->addFieldToFilter('status', 'pending_payment')
+            ->addFieldToFilter('state', ['in' => [Order::STATE_PENDING_PAYMENT, Order::STATE_PAYMENT_REVIEW]])
             ->setPageSize($limit);
         $orders->getSelect()->joinInner(
             ['sop' => $orders->getTable('sales_order_payment')],
@@ -119,9 +125,11 @@ class Reconciler
         if (!$paid) {
             return 0;
         }
+        // Placed redirect-gateway orders sit in payment_review (pending
+        // transaction), not pending_payment — sweep both states, and let
+        // the link-code join below be the real selector.
         $orders = $this->collectionFactory->create()
-            ->addFieldToFilter('state', Order::STATE_PENDING_PAYMENT)
-            ->addFieldToFilter('status', 'pending_payment');
+            ->addFieldToFilter('state', ['in' => [Order::STATE_PENDING_PAYMENT, Order::STATE_PAYMENT_REVIEW]]);
         $orders->getSelect()->joinInner(
             ['sop' => $orders->getTable('sales_order_payment')],
             'sop.parent_id = main_table.entity_id',
@@ -139,11 +147,34 @@ class Reconciler
     /** Complete one order for a paid link — exactly once (state-guarded). */
     private function completeOrder($order, $code)
     {
-        if ($order->getState() !== Order::STATE_PENDING_PAYMENT) {
+        // Exactly-once guard: only orders still WAITING for this payment
+        // may complete. Placed redirect-gateway orders wait in
+        // payment_review (pending transaction); pending_payment is the
+        // other waiting state. Anything further along has already been
+        // completed (or cancelled) and must not be captured twice.
+        if (!in_array($order->getState(), [Order::STATE_PENDING_PAYMENT, Order::STATE_PAYMENT_REVIEW], true)) {
+            return false;
+        }
+        // Already fully paid (e.g. captured by an earlier pass) — never
+        // register a second capture.
+        if ((float) $order->getGrandTotal() > 0
+            && (float) $order->getTotalPaid() >= (float) $order->getGrandTotal()) {
             return false;
         }
         try {
-            $order->getPayment()->registerCaptureNotification((float) $order->getGrandTotal());
+            $payment = $order->getPayment();
+            $payment->setIsTransactionPending(false);
+            $payment->registerCaptureNotification((float) $order->getGrandTotal());
+            // Core's capture-notification state command only advances
+            // new/pending_payment orders; a payment_review order stays in
+            // review until the GATEWAY moves it (that is the core
+            // notification-handler contract). Settlement is confirmed, so
+            // advance it — otherwise paid orders can never be fulfilled.
+            if ($order->getState() === Order::STATE_PAYMENT_REVIEW
+                && !$payment->getIsFraudDetected()) {
+                $order->setState(Order::STATE_PROCESSING);
+                $order->setStatus($order->getConfig()->getStateDefaultStatus(Order::STATE_PROCESSING));
+            }
             $order->addCommentToStatusHistory(
                 'BMaGlass Pay payment confirmed (link ' . $code . ').'
             );

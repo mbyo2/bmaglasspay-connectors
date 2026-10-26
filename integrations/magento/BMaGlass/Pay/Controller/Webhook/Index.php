@@ -3,6 +3,7 @@
 namespace BMaGlass\Pay\Controller\Webhook;
 
 use BMaGlass\Pay\Model\Api\Client;
+use BMaGlass\Pay\Model\Config;
 use BMaGlass\Pay\Model\Reconciler;
 use Magento\Framework\App\Action\Action;
 use Magento\Framework\App\Action\Context;
@@ -26,20 +27,22 @@ class Index extends Action implements CsrfAwareActionInterface
 {
     private $scopeConfig;
     private $reconciler;
+    private $config;
 
-    public function __construct(Context $context, ScopeConfigInterface $scopeConfig, Reconciler $reconciler)
+    public function __construct(Context $context, ScopeConfigInterface $scopeConfig, Reconciler $reconciler, Config $config = null)
     {
         parent::__construct($context);
         $this->scopeConfig = $scopeConfig;
         $this->reconciler = $reconciler;
+        $this->config = $config ?: \Magento\Framework\App\ObjectManager::getInstance()->get(Config::class);
     }
 
-    public function createCsrfValidationException(RequestInterface $request)
+    public function createCsrfValidationException(RequestInterface $request): ?\Magento\Framework\App\Request\InvalidRequestException
     {
         return null;
     }
 
-    public function validateForCsrf(RequestInterface $request)
+    public function validateForCsrf(RequestInterface $request): ?bool
     {
         return true;
     }
@@ -47,7 +50,7 @@ class Index extends Action implements CsrfAwareActionInterface
     public function execute()
     {
         $result = $this->resultFactory->create(ResultFactory::TYPE_RAW);
-        $secret = (string) $this->scopeConfig->getValue('payment/bmaglasspay/webhook_secret');
+        $secret = $this->config->webhookSecret();
         $raw = (string) $this->getRequest()->getContent();
         $signature = (string) $this->getRequest()->getHeader('X-BMaGlass-Signature');
         if ($secret === '' || !Client::verifyWebhookSignature($raw, $signature, $secret)) {

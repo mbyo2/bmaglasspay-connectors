@@ -4,6 +4,7 @@ namespace BMaGlass\Pay\Controller\Checkout;
 
 use BMaGlass\Pay\Model\Api\ApiException;
 use BMaGlass\Pay\Model\Api\Client;
+use BMaGlass\Pay\Model\Config;
 use BMaGlass\Pay\Model\Reconciler;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\App\Action\Action;
@@ -20,17 +21,28 @@ class Redirect extends Action
     private $checkoutSession;
     private $scopeConfig;
     private $orderRepository;
+    private $config;
 
     public function __construct(
         Context $context,
         CheckoutSession $checkoutSession,
         ScopeConfigInterface $scopeConfig,
-        OrderRepositoryInterface $orderRepository
+        OrderRepositoryInterface $orderRepository,
+        Config $config = null
     ) {
         parent::__construct($context);
         $this->checkoutSession = $checkoutSession;
         $this->scopeConfig = $scopeConfig;
         $this->orderRepository = $orderRepository;
+        $this->config = $config ?: \Magento\Framework\App\ObjectManager::getInstance()->get(Config::class);
+    }
+
+    /** Magento 2 actions have no _redirectUrl(); external URLs need a redirect result. */
+    private function externalRedirect($url)
+    {
+        $result = $this->resultRedirectFactory->create();
+        $result->setUrl($url);
+        return $result;
     }
 
     public function execute()
@@ -43,11 +55,11 @@ class Redirect extends Action
         $payment = $order->getPayment();
         $existing = $payment->getAdditionalInformation('bmaglass_link_code');
         if ($existing) {
-            return $this->_redirectUrl(Client::paymentLinkUrl($existing));
+            return $this->externalRedirect(Client::paymentLinkUrl($existing));
         }
         try {
             $currency = Client::assertSupportedCurrency($order->getOrderCurrencyCode());
-            $key = (string) $this->scopeConfig->getValue('payment/bmaglasspay/api_key');
+            $key = $this->config->apiKey();
             $client = new Client($key);
             $link = $client->createPaymentLink(
                 'Order #' . $order->getIncrementId(),
@@ -58,7 +70,7 @@ class Redirect extends Action
             $payment->setAdditionalInformation('bmaglass_link_code', $link['link_code']);
             $payment->setAdditionalInformation('bmaglass_url', Client::paymentLinkUrl($link['link_code']));
             $this->orderRepository->save($order);
-            return $this->_redirectUrl(Client::paymentLinkUrl($link['link_code']));
+            return $this->externalRedirect(Client::paymentLinkUrl($link['link_code']));
         } catch (ApiException $e) {
             $this->messageManager->addErrorMessage(__($e->userMessage()));
             return $this->_redirect('checkout/cart');
