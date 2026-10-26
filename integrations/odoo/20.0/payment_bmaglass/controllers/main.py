@@ -50,11 +50,11 @@ class BMaGlassPayController(http.Controller):
             tx = request.env["payment.transaction"].sudo().search(
                 [("bmaglass_link_code", "=", data.get("link_code"))], limit=1)
             if tx:
-                settled = tx._bmaglass_settle_from_paid_event(data)
-                if not settled:
-                    # The event's checks declined it — verify against
-                    # the API instead of trusting the payload further.
-                    tx._bmaglass_check_paid()
+                # Odoo 20 (B12): never write the transaction from the
+                # controller — queue the verified event payload through
+                # _record(); _apply_updates() performs the cross-checks
+                # and the state change under core's locked processing.
+                tx._record(dict(data))
             else:
                 _logger.info(
                     "BMaGlass payment_link.paid for unknown link %s.", data.get("link_code"))
