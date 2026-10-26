@@ -41,7 +41,9 @@ class PaymentProvider(models.Model):
             raise UserError(e.user_message())
 
     def _bmaglass_webhook_url(self):
-        base = self.env["ir.config_parameter"].sudo().get_param("web.base.url")
+        # Odoo 20 replaced ir.config_parameter.get_param/set_param with
+        # typed accessors (get_str/set_str) — install-test finding B8.
+        base = self.env["ir.config_parameter"].sudo().get_str("web.base.url", "")
         return "%s/payment/bmaglass/webhook" % base.rstrip("/")
 
     # -- framework hooks --------------------------------------------------
