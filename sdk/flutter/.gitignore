@@ -1,0 +1,6 @@
+# Files and directories created by pub.
+.dart_tool/
+
+# Library package: the lockfile is a local build artefact, not
+# checked in (pub.dev convention for packages).
+pubspec.lock

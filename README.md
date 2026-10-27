@@ -21,7 +21,7 @@ from the BMaGlass Pay dashboard.
 | Python — `bmaglass-sdk` | [`sdk/python`](sdk/python) | Contract tests pass |
 | PHP — `bmaglass/bmaglass-sdk` | [`sdk/php`](sdk/php) | Tests pass |
 | React Native / Expo — `@bmaglass/sdk-react-native` | [`sdk/react-native`](sdk/react-native) | Tests pass |
-| Flutter (Dart) — `bmaglass_sdk` | [`sdk/flutter`](sdk/flutter) | Code + tests written; **tests not yet run** — no Dart toolchain was available in the build environment. Run them where a toolchain exists before relying on it. |
+| Flutter (Dart) — `bmaglass_sdk` | [`sdk/flutter`](sdk/flutter) | Tests pass — **verified 2026-10-27**: `dart analyze` clean and `dart test` 9/9 on Dart 3.13.7 (the Dart version bundled with Flutter 3.47.8). Pure-Dart package; no Flutter engine needed to run the suite. |
 
 Shared contract tests live in [`sdk/tests`](sdk/tests/). See
 [`sdk/README.md`](sdk/README.md) for per-SDK install and test commands.

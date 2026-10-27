@@ -12,6 +12,7 @@ Contract: `openapi.json` in this directory (also served by the app at `/openapi.
   `Client::verifyWebhookSignature` / `Client::parseWebhookEvent`. Lifted from the WooCommerce
   plugin's client. Test: `php sdk/php/tests/run-tests.php`.
 - `flutter/` — `bmaglass_sdk` (Dart): equivalent client for Flutter apps. See its README.
+  Test: `dart test` (or `flutter test`) — passes 9/9, `dart analyze` clean (verified 2026-10-27, Dart 3.13.7).
 - `react-native/` — `@bmaglass/sdk-react-native`: equivalent client for React Native / Expo apps.
   See its README.
 

@@ -143,3 +143,9 @@ The SDKs in `sdk/` are version-agnostic by design (they wrap one
 HTTP API): TypeScript, Python, PHP (PHP ≥ 7.4 declared; the code
 itself parses on PHP 7.2, which is what the legacy-platform
 variants above rely on), React Native, Flutter. See `sdk/README.md`.
+
+Every SDK test suite has now been run and passes — the Flutter
+(Dart) suite was the last holdout and was **verified 2026-10-27**
+(`dart analyze` clean, `dart test` 9/9 on Dart 3.13.7, the Dart
+bundled with Flutter 3.47.8; the package is pure Dart, so no
+Flutter engine is involved in the suite).

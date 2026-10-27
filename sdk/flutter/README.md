@@ -51,12 +51,13 @@ final event = parseWebhookEvent(rawBody, signatureHeader, webhookSecret);
 
 ## Verification status
 
-The Dart/Flutter toolchain is **not present in the build sandbox**
-this package was authored in, so `dart analyze` / `dart test` have
-not been run there. The tests in `test/bmaglass_sdk_test.dart` use
+**Verified 2026-10-27** on Dart SDK 3.13.7 (stable, linux x64 — the
+Dart version bundled with Flutter 3.47.8): `dart analyze` reports no
+issues and `dart test` passes **9/9**. This is a pure-Dart package
+(no Flutter SDK dependency in `pubspec.yaml`), so the Dart toolchain
+alone runs the whole suite. The tests in `test/bmaglass_sdk_test.dart` use
 `package:http`'s MockClient (no network) and the same shared
-cross-SDK HMAC known-answer vector as the other five SDK suites —
-run them where a toolchain exists:
+cross-SDK HMAC known-answer vector as the other SDK suites:
 
 ```bash
 cd sdk/flutter && dart test   # or: flutter test
