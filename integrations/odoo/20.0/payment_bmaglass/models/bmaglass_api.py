@@ -248,6 +248,12 @@ class BMaGlassClient:
             body["expires_at"] = expires_at
         return self._request("POST", "payment-links", body)
 
+    def payment_link_attempts(self, link_id):
+        return self._request("GET", "payment-links/%s/attempts" % link_id)
+
+    def settings(self):
+        return self._request("GET", "settings")
+
     def bitcoin_balance(self):
         return self._request("GET", "bitcoin/balance")
 

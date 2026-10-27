@@ -40,6 +40,10 @@ class FakeSession:
             return FakeResponse(200, {"data": [{"asset": "BTC", "balance_sats": 1000}], "mode": "test"})
         if url.endswith("/webhooks") and method == "POST":
             return FakeResponse(201, {"data": {"id": "wh1", "secret": "whsec_testsecret"}, "mode": "test"})
+        if url.endswith("/settings"):
+            return FakeResponse(200, {"data": {"fee_payer_default": "seller", "platform_fee_percent": 2.5, "paypal_platform_fee_percent": 1, "note": "n"}, "mode": "test"})
+        if url.endswith("/payment-links/link1/attempts"):
+            return FakeResponse(200, {"data": [{"id": "att1", "status": "waiting"}], "mode": "test"})
         return FakeResponse(404, {"error": "not_found", "message": "no route"})
 
 
@@ -70,6 +74,13 @@ class SdkContractTest(unittest.TestCase):
         self.assertEqual(self.client.bitcoin.balance()[0]["balance_sats"], 1000)
         hook = self.client.webhooks.create("https://example.com/hook")
         self.assertEqual(hook["secret"], "whsec_testsecret")
+
+    def test_settings_and_attempts(self):
+        settings = self.client.settings.get()
+        self.assertEqual(settings["fee_payer_default"], "seller")
+        self.assertEqual(settings["platform_fee_percent"], 2.5)
+        self.assertEqual(settings["paypal_platform_fee_percent"], 1)
+        self.assertEqual(self.client.payment_links.attempts("link1")[0]["status"], "waiting")
 
 
 class WebhookVerifyTest(unittest.TestCase):

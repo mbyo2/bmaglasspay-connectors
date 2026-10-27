@@ -24,6 +24,8 @@ export interface PaymentLink { id: string; title: string; description: string | 
 export interface WebhookEndpoint { id: string; url: string; events: string[]; is_active: boolean; created_at: string; secret?: string }
 export interface WebhookDelivery { id: string; webhook_id: string | null; event_id: string; event_type: string; webhook_url: string; status: string; attempts: number; response_status: number | null; error_message: string | null; created_at: string }
 export interface BitcoinQuote { id: string; side: "buy" | "sell"; amount_zmw: number; amount_sats: number; fee_bps: number; fee_zmw: number; mid_rate_zmw: number; expires_at: string; created_at: string }
+export interface AccountSettings { fee_payer_default: "seller" | "buyer"; platform_fee_percent: number | null; paypal_platform_fee_percent: number | null; note: string }
+export interface PaymentLinkAttempt { id: string; fiat_amount: number | null; fiat_currency: string; fee_payer: string; fee_percent: number | null; fee_sats: number | null; amount_sats: number | null; required_sats: number | null; seen_sats: number | null; received_sats: number | null; status: string; onchain_address: string | null; lightning_invoice: string | null; expires_at: string | null; settled_at: string | null; created_at: string }
 
 export interface BMaGlassOptions {
   apiKey: string;
@@ -82,6 +84,12 @@ export class BMaGlass {
     /** Live keys only. */
     create: (input: { title: string; description?: string; amount?: number; currency?: string; expires_at?: string }) =>
       this.request<PaymentLink>("POST", "payment-links", input),
+    /** A link's Bitcoin payment attempts (quote, sats received, status). */
+    attempts: (id: string) => this.request<PaymentLinkAttempt[]>("GET", `payment-links/${id}/attempts`),
+  };
+  settings = {
+    /** The merchant's fee-bearer default + the platform's current fee rates. Read-only; any valid key. */
+    get: () => this.request<AccountSettings>("GET", "settings"),
   };
   bitcoin = {
     balance: () => this.request<Array<{ asset: string; balance_sats: number; available_sats: number; updated_at: string }>>("GET", "bitcoin/balance"),

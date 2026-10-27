@@ -134,6 +134,24 @@ class Client
         return $this->request('POST', 'payment-links', $body);
     }
 
+    /** GET /payment-links/{id}/attempts — a link's Bitcoin payment attempts. */
+    public function paymentLinkAttempts($linkId)
+    {
+        return $this->request('GET', 'payment-links/' . rawurlencode((string) $linkId) . '/attempts');
+    }
+
+    /**
+     * GET /settings — the merchant's fee-bearer default
+     * (fee_payer_default) and the platform's current fee rates
+     * (platform_fee_percent, paypal_platform_fee_percent). Read-only;
+     * available to any valid key. The default itself is set in the
+     * BMaGlass Pay dashboard — clients inherit it, they do not set it.
+     */
+    public function settings()
+    {
+        return $this->request('GET', 'settings');
+    }
+
     /** GET /bitcoin/balance */
     public function bitcoinBalance()
     {

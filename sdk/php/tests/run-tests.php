@@ -46,6 +46,12 @@ $transport = function ($method, $url, $headers, $body) use (&$calls) {
     if (str_ends_with($url, '/transfers')) {
         return array(201, json_encode(array('data' => array('transaction_id' => 'tx1'), 'mode' => 'live')));
     }
+    if (str_ends_with($url, '/settings')) {
+        return array(200, json_encode(array('data' => array('fee_payer_default' => 'seller', 'platform_fee_percent' => 2.5, 'paypal_platform_fee_percent' => 1, 'note' => 'n'), 'mode' => 'test')));
+    }
+    if (str_ends_with($url, '/payment-links/link1/attempts')) {
+        return array(200, json_encode(array('data' => array(array('id' => 'att1', 'status' => 'waiting')), 'mode' => 'test')));
+    }
     return array(404, json_encode(array('error' => 'not_found', 'message' => 'no route')));
 };
 
@@ -63,6 +69,13 @@ $wallets = $test->wallets();
 eq('wallets balance', $wallets[0]['balance'], 42);
 $last = end($calls);
 check('X-Api-Key header sent', strpos(implode(' ', $last['headers']), 'X-Api-Key: bmp_test_contract') !== false);
+
+$settings = $test->settings();
+eq('settings fee default', $settings['fee_payer_default'], 'seller');
+eq('settings link rate', $settings['platform_fee_percent'], 2.5);
+eq('settings paypal rate', $settings['paypal_platform_fee_percent'], 1);
+$attempts = $test->paymentLinkAttempts('link1');
+eq('attempts status', $attempts[0]['status'], 'waiting');
 
 $live = new Client('bmp_live_contract', 'http://local.test', $transport);
 $link = $live->createPaymentLink('Order #7', 10.5, 'zmw');

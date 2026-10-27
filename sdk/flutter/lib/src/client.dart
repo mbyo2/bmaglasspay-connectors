@@ -158,6 +158,22 @@ class BMaGlass {
     return PaymentLink.fromJson(data);
   }
 
+  /// GET /payment-links/{id}/attempts — a link's Bitcoin payment attempts.
+  Future<List<Map<String, dynamic>>> paymentLinkAttempts(String linkId) async {
+    final data = await _request('GET', 'payment-links/${Uri.encodeComponent(linkId)}/attempts') as List<dynamic>;
+    return data.map((e) => e as Map<String, dynamic>).toList();
+  }
+
+  /// GET /settings — the merchant's fee-bearer default
+  /// (fee_payer_default) and the platform's current fee rates
+  /// (platform_fee_percent, paypal_platform_fee_percent). Read-only;
+  /// available to any valid key. The default itself is set in the
+  /// BMaGlass Pay dashboard — clients inherit it, they do not set it.
+  Future<Map<String, dynamic>> settings() async {
+    final data = await _request('GET', 'settings') as Map<String, dynamic>;
+    return data;
+  }
+
   /// GET /bitcoin/balance
   Future<List<Map<String, dynamic>>> bitcoinBalance() async {
     final data = await _request('GET', 'bitcoin/balance') as List<dynamic>;

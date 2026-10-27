@@ -12,8 +12,8 @@ BMaGlass webhooks fire for:
 | Event | When | Payload `data` |
 |---|---|---|
 | `transaction.completed` | a transfer made **via the developer API** completes | `{transaction_id, amount, currency, to_user_id}` |
-| `payment_link.created` | a payment link is created (app or API) | the link row (`id`, `link_code`, `title`, `amount`, `currency`, `status`) |
-| `payment_link.paid` | a buyer **pays** a payment link (exactly once per settlement) | `{payment_link_id, link_code, title, amount, currency, transaction_id, payer_transaction_id, payment_method, payment_count, total_collected, reference, metadata, settled_at}` |
+| `payment_link.created` | a payment link is created (app or API) | the link row (`id`, `link_code`, `title`, `amount`, `currency`, `status`, `fee_payer`, `fee_amount`, `buyer_total`, `seller_receives`, `redirect_url`, `created_at`) |
+| `payment_link.paid` | a buyer **pays** a payment link (exactly once per settlement) | `{payment_link_id, link_code, title, amount, currency, fee_payer, fee_amount, total_charged, transaction_id, payer_transaction_id, payment_method, payment_count, total_collected, reference, metadata, settled_at}` |
 | `webhook.test` | you press "send test" | `{ping: true}` |
 
 Example payloads: `examples/*.json` in this folder.

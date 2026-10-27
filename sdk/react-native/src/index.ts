@@ -132,6 +132,12 @@ export class BMaGlass {
     create: (input: { title: string; description?: string; amount?: number; currency?: string; expires_at?: string }) =>
       this.request<PaymentLink>("POST", "payment-links",
         { ...input, currency: assertSupportedCurrency(input.currency ?? "ZMW") }),
+    /** A link's Bitcoin payment attempts (quote, sats received, status). */
+    attempts: (id: string) => this.request<unknown[]>("GET", `payment-links/${id}/attempts`),
+  };
+  settings = {
+    /** The merchant's fee-bearer default + the platform's current fee rates. Read-only; any valid key. */
+    get: () => this.request<{ fee_payer_default: string; platform_fee_percent: number | null; paypal_platform_fee_percent: number | null; note: string }>("GET", "settings"),
   };
   bitcoin = {
     balance: () => this.request<Array<{ asset: string; balance_sats: number; available_sats: number; updated_at: string }>>("GET", "bitcoin/balance"),

@@ -20,6 +20,24 @@ http.Client stubClient() {
     if (!key.startsWith('bmp_')) {
       return http.Response(jsonEncode({'error': 'invalid_api_key', 'message': 'nope'}), 401);
     }
+    if (req.url.path.endsWith('/settings')) {
+      return http.Response(
+          jsonEncode({
+            'data': {'fee_payer_default': 'seller', 'platform_fee_percent': 2.5, 'paypal_platform_fee_percent': 1, 'note': 'n'},
+            'mode': 'test'
+          }),
+          200);
+    }
+    if (req.url.path.endsWith('/payment-links/link1/attempts')) {
+      return http.Response(
+          jsonEncode({
+            'data': [
+              {'id': 'att1', 'status': 'waiting'}
+            ],
+            'mode': 'test'
+          }),
+          200);
+    }
     if (req.url.path.endsWith('/wallets')) {
       return http.Response(
           jsonEncode({
@@ -85,6 +103,15 @@ void main() {
       final wallets = await client.wallets();
       expect(wallets.single.balance, 42);
       expect(wallets.single.currency, 'ZMW');
+    });
+    test('settings and attempts', () async {
+      final client = BMaGlass(apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', httpClient: stubClient());
+      final settings = await client.settings();
+      expect(settings['fee_payer_default'], 'seller');
+      expect(settings['platform_fee_percent'], 2.5);
+      expect(settings['paypal_platform_fee_percent'], 1);
+      final attempts = await client.paymentLinkAttempts('link1');
+      expect(attempts.single['status'], 'waiting');
     });
     test('payment link create (live key)', () async {
       final client = BMaGlass(apiKey: 'bmp_live_contract', baseUrl: 'http://local.test', httpClient: stubClient());

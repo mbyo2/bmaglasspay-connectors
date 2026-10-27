@@ -42,6 +42,10 @@ class FakeTransport:
                                              "link_code": "ABC123"}, "mode": "live"})
         if url.endswith("/webhooks") and method == "POST":
             return 201, json.dumps({"data": {"id": "wh1", "secret": "whsec_testsecret"}, "mode": "live"})
+        if url.endswith("/settings"):
+            return 200, json.dumps({"data": {"fee_payer_default": "seller", "platform_fee_percent": 2.5, "paypal_platform_fee_percent": 1, "note": "n"}, "mode": "test"})
+        if url.endswith("/payment-links/pl1/attempts"):
+            return 200, json.dumps({"data": [{"id": "att1", "status": "waiting"}], "mode": "test"})
         return 404, json.dumps({"error": "not_found", "message": "no route"})
 
 
@@ -90,6 +94,13 @@ class ClientTest(unittest.TestCase):
     def test_webhook_create_returns_one_time_secret(self):
         hook = self.live_client.create_webhook("https://example.com/hook")
         self.assertEqual(hook["secret"], "whsec_testsecret")
+
+    def test_settings_and_attempts(self):
+        settings = self.test_client.settings()
+        self.assertEqual(settings["fee_payer_default"], "seller")
+        self.assertEqual(settings["platform_fee_percent"], 2.5)
+        self.assertEqual(settings["paypal_platform_fee_percent"], 1)
+        self.assertEqual(self.test_client.payment_link_attempts("pl1")[0]["status"], "waiting")
 
 
 class WebhookVerifyTest(unittest.TestCase):

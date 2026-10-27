@@ -69,7 +69,7 @@ Full landscape and sources: [`VERSIONS.md`](../../VERSIONS.md).
 ## Verification (all variants)
 
 `python3 -m compileall` clean per module;
-`<version>/tests/test_bmaglass_client.py` — 14 tests green per
+`<version>/tests/test_bmaglass_client.py` — 15 tests green per
 variant (stub transport; client behaviour, HMAC known-answer
 vector, `payment_link.paid` semantic guard). The client was
 additionally live-proven against the production developer API in

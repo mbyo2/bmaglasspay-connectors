@@ -38,6 +38,7 @@ class BMaGlass:
         self.payment_links = _PaymentLinks(self)
         self.bitcoin = _Bitcoin(self)
         self.webhooks = _Webhooks(self)
+        self.settings = _Settings(self)
 
     def _request(self, method: str, path: str, body: Any = None, headers: Optional[dict] = None) -> Any:
         hdrs = {"X-Api-Key": self.api_key, "Content-Type": "application/json"}
@@ -81,6 +82,12 @@ class _PaymentLinks:
     def __init__(self, c: BMaGlass): self.c = c
     def list(self): return self.c._request("GET", "payment-links")
     def create(self, title: str, **kwargs): return self.c._request("POST", "payment-links", {"title": title, **kwargs})
+    def attempts(self, link_id: str): return self.c._request("GET", f"payment-links/{link_id}/attempts")
+
+
+class _Settings:
+    def __init__(self, c: BMaGlass): self.c = c
+    def get(self): return self.c._request("GET", "settings")
 
 
 class _Bitcoin:

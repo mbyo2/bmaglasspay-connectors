@@ -21,6 +21,8 @@ const server = createServer((req, res) => {
     if (req.url === "/payment-links" && req.method === "GET") return reply(200, { data: [], mode: "test" });
     if (req.url === "/bitcoin/balance") return reply(200, { data: [{ asset: "BTC", balance_sats: 1000, available_sats: 1000, updated_at: "z" }], mode: "test" });
     if (req.url === "/webhooks" && req.method === "POST") return reply(201, { data: { id: "wh1", url: "https://example.com/hook", events: ["webhook.test"], is_active: true, created_at: "t", secret: "whsec_testsecret" }, mode: "test" });
+    if (req.url === "/settings") return reply(200, { data: { fee_payer_default: "seller", platform_fee_percent: 2.5, paypal_platform_fee_percent: 1, note: "n" }, mode: "test" });
+    if (req.url === "/payment-links/link1/attempts") return reply(200, { data: [{ id: "att1", status: "waiting" }], mode: "test" });
     return reply(404, { error: "not_found", message: "no route" });
   });
 });
@@ -44,6 +46,11 @@ assert.deepEqual(await client.paymentLinks.list(), []);
 assert.equal((await client.bitcoin.balance())[0].balance_sats, 1000);
 const hook = await client.webhooks.create({ url: "https://example.com/hook" });
 assert.equal(hook.secret, "whsec_testsecret");
+const settings = await client.settings.get();
+assert.equal(settings.fee_payer_default, "seller");
+assert.equal(settings.platform_fee_percent, 2.5);
+assert.equal(settings.paypal_platform_fee_percent, 1);
+assert.equal((await client.paymentLinks.attempts("link1"))[0].status, "waiting");
 
 // Webhook verification: known-answer vector (HMAC-SHA256, computed independently).
 const raw = '{"id":"evt_1","type":"webhook.test","created":"2026-10-26T00:00:00.000Z","data":{"ping":true}}';

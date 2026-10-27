@@ -45,7 +45,7 @@ exactly-once settlement.
 ## Verification status (honest boundary)
 
 - `python3 -m compileall` clean; `tests/test_bmaglass_client.py`
-  (this folder) — 14 tests green against a stub transport.
+  (this folder) — 15 tests green against a stub transport.
 - The vendored client is byte-identical across all five Odoo
   variants (`../check-clients.sh`) and was live-proven against the
   production developer API in the original programme.

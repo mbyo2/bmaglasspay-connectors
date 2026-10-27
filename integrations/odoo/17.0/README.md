@@ -42,7 +42,7 @@ repo's [`VERSIONS.md`](../../../VERSIONS.md).
 ## Verification status (honest boundary)
 
 - `python3 -m compileall` clean; `tests/test_bmaglass_client.py`
-  (this folder) — 14 tests green against a stub transport: client
+  (this folder) — 15 tests green against a stub transport: client
   behaviour, the shared HMAC known-answer vector, and the
   `payment_link.paid` semantic guard.
 - The vendored client (`models/bmaglass_api.py`) is byte-identical

@@ -57,6 +57,8 @@ function stubFetch(handler) {
   const fetchImpl = stubFetch((url, init) => {
     if (!String(init.headers['X-Api-Key']).startsWith('bmp_')) return { status: 401, body: { error: 'invalid_api_key', message: 'nope' } };
     if (url.endsWith('/wallets')) return { status: 200, body: { data: [{ id: 'w1', currency: 'ZMW', balance: 42 }], mode: 'test' } };
+    if (url.endsWith('/settings')) return { status: 200, body: { data: { fee_payer_default: 'seller', platform_fee_percent: 2.5, paypal_platform_fee_percent: 1, note: 'n' }, mode: 'test' } };
+    if (url.endsWith('/payment-links/link1/attempts')) return { status: 200, body: { data: [{ id: 'att1', status: 'waiting' }], mode: 'test' } };
     if (url.endsWith('/payment-links') && init.method === 'POST') return { status: 403, body: { error: 'test_mode_read_only', message: 'Test keys are read-only' } };
     return { status: 404, body: { error: 'not_found', message: 'no route' } };
   });
@@ -64,6 +66,9 @@ function stubFetch(handler) {
   check('mode is test', client.mode === 'test');
   const wallets = await client.wallets.list();
   check('wallets balance', wallets[0].balance === 42);
+  const settings = await client.settings.get();
+  check('settings fee default', settings.fee_payer_default === 'seller' && settings.platform_fee_percent === 2.5 && settings.paypal_platform_fee_percent === 1);
+  check('attempts', (await client.paymentLinks.attempts('link1'))[0].status === 'waiting');
   try {
     await client.paymentLinks.create({ title: 'X', amount: 5 });
     check('test-key write throws', false);
