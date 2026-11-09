@@ -14,7 +14,10 @@ const server = createServer((req, res) => {
   req.on("end", () => {
     seen.push({ method: req.method, url: req.url, key: req.headers["x-api-key"], idem: req.headers["idempotency-key"], body });
     const reply = (status, obj) => { res.writeHead(status, { "Content-Type": "application/json" }); res.end(JSON.stringify(obj)); };
-    if (req.headers["x-api-key"] !== "bmp_test_contract") return reply(401, { error: "invalid_api_key", message: "nope" });
+    if (!["bmp_test_contract", "bmg_sandbox_contract"].includes(req.headers["x-api-key"])) return reply(401, { error: "invalid_api_key", message: "nope" });
+    if (req.url === "/connector/config") return reply(200, { data: { environment: "sandbox", livemode: false, config_version: "abc123", key: { key_id: "k1", scopes: ["config:read"], status: "active" }, business: { display_name: "QA Store", country: "ZM", currency: "ZMW", status: "pending" }, features: { invoices: { status: "enabled", reason_code: null }, payment_links: { status: "enabled", reason_code: null }, bitcoin: { status: "enabled", reason_code: null }, transfers: { status: "disabled", reason_code: "sandbox_simulation_only" }, mobile_money: { status: "disabled", reason_code: null } }, settlement: { type: "wallet", currency: "ZMW" } }, mode: "test" });
+    if (req.url === "/invoices" && req.method === "POST") return reply(201, { data: { id: "inv1", amount: 250, currency: "ZMW", description: null, customer_email: null, status: "open", environment: "sandbox", livemode: false, metadata: {}, paid_at: null, created_at: "t" }, mode: "test" });
+    if (req.url === "/invoices/inv1/simulate-payment") return reply(200, { data: { id: "inv1", amount: 250, currency: "ZMW", description: null, customer_email: null, status: "paid", environment: "sandbox", livemode: false, metadata: {}, paid_at: "t", created_at: "t" }, mode: "test", simulated: true });
     if (req.url === "/wallets") return reply(200, { data: [{ id: "w1", currency: "ZMW", balance: 42, status: "active", created_at: "x", updated_at: "y" }], mode: "test" });
     if (req.url?.startsWith("/transactions")) return reply(200, { data: [], mode: "test" });
     if (req.url === "/transfers") return reply(403, { error: "test_mode_read_only", message: "Test keys are read-only" });
@@ -31,7 +34,22 @@ const base = `http://127.0.0.1:${server.address().port}`;
 
 const client = new BMaGlass({ apiKey: "bmp_test_contract", baseUrl: base });
 assert.equal(client.mode, "test");
+assert.equal(client.environment, "sandbox");
 assert.equal(new BMaGlass({ apiKey: "bmp_live_x", baseUrl: base }).mode, "live");
+assert.equal(new BMaGlass({ apiKey: "bmp_live_x", baseUrl: base }).environment, "production");
+assert.equal(new BMaGlass({ apiKey: "bmg_sandbox_x", baseUrl: base }).environment, "sandbox");
+assert.equal(new BMaGlass({ apiKey: "bmg_live_x", baseUrl: base }).environment, "production");
+
+const sandboxClient = new BMaGlass({ apiKey: "bmg_sandbox_contract", baseUrl: base });
+const cfg = await sandboxClient.connectorConfig();
+assert.equal(cfg.environment, "sandbox");
+assert.equal(cfg.business.country, "ZM");
+assert.equal(cfg.features.mobile_money.status, "disabled");
+assert.equal(cfg.features.transfers.reason_code, "sandbox_simulation_only");
+const inv = await sandboxClient.invoices.create({ amount: 250, currency: "ZMW" });
+assert.equal(inv.status, "open");
+const paidInv = await sandboxClient.invoices.simulatePayment("inv1");
+assert.equal(paidInv.status, "paid");
 assert.throws(() => new BMaGlass({ apiKey: "sk_live_nope" }), BMaGlassError);
 
 const wallets = await client.wallets.list();

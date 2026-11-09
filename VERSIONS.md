@@ -26,6 +26,20 @@ list above (e.g. Magento 2.4.6/2.4.7/2.4.9, PrestaShop 9.2, 8.2.x)
 remain documentation-adapted and syntax/unit-proven only —
 install proof is claimed for exactly the versions named here.
 
+**API key environments update (9 Nov 2026):** the platform's keys moved to
+sandbox/production environments (`bmg_sandbox_` / `bmg_live_`; legacy
+`bmp_test_` / `bmp_live_` keys remain valid). Every SDK and vendored client
+in this repo accepts both key families, derives its environment from the
+key alone, and reads connector configuration (business country/currency,
+feature states incl. Zambia-gated mobile money) from
+`GET /connector/config`. This update is proven at SDK + stub-harness level
+for all five SDKs and the PHP client family, and live against the deployed
+API via `sdk/tests/conformance.live.mjs` with QA keys (config fetch,
+sandbox simulated settlement, segregation and refusal cases). Store-CMS
+install-level proof for the new key formats specifically has NOT been
+re-run — the connectors' install proofs above predate the key change, and
+the key handling itself is covered by the client-level suites named here.
+
 ## Odoo — one module per major: `integrations/odoo/<version>/`
 
 Sources: odoo.com release notes (20.0, 24 Sep 2026), the versioned

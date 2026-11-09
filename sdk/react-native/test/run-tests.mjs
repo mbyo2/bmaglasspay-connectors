@@ -64,6 +64,8 @@ function stubFetch(handler) {
   });
   const client = new BMaGlass({ apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', fetchImpl });
   check('mode is test', client.mode === 'test');
+  check('environment is sandbox', client.environment === 'sandbox');
+  check('bmg live environment is production', new BMaGlass({ apiKey: 'bmg_live_x', baseUrl: 'http://local.test', fetchImpl }).environment === 'production');
   const wallets = await client.wallets.list();
   check('wallets balance', wallets[0].balance === 42);
   const settings = await client.settings.get();
@@ -74,7 +76,7 @@ function stubFetch(handler) {
     check('test-key write throws', false);
   } catch (e) {
     check('test-key write throws typed error', e instanceof BMaGlassError && e.code === 'test_mode_read_only' && e.isTestModeReadOnly);
-    check('userMessage honest', e.userMessage().includes('no test-mode ledger'));
+    check('userMessage honest', e.userMessage().includes('sandbox key'));
   }
   try {
     await client.transfers.create({ to_user_id: 'u2', amount: 1, currency: 'EUR' });

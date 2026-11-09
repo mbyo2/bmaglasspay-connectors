@@ -135,7 +135,7 @@ class Bmaglasspay extends PaymentModule
                 'description' => $this->l('Webhook URL to register in BMaGlass Pay: ') . $webhookUrl
                     . '<br>' . $this->l('Test keys are read-only (connection and balance checks only); checkout requires a live key. Currencies: ZMW and USD only.'),
                 'input' => array(
-                    array('type' => 'text', 'label' => $this->l('API key'), 'name' => 'BMGLASS_API_KEY', 'required' => true, 'desc' => $this->l('bmp_live_... (or bmp_test_... for a connection check)')),
+                    array('type' => 'text', 'label' => $this->l('API key'), 'name' => 'BMGLASS_API_KEY', 'required' => true, 'desc' => $this->l('bmg_live_... for checkout (or bmg_sandbox_... for connection checks and simulated payments; legacy bmp_ keys keep working)')),
                     array('type' => 'text', 'label' => $this->l('Webhook signing secret'), 'name' => 'BMGLASS_WEBHOOK_SECRET', 'desc' => $this->l('Shown once when you register the webhook in BMaGlass Pay.')),
                 ),
                 'buttons' => array(
@@ -160,7 +160,7 @@ class Bmaglasspay extends PaymentModule
             return array();
         }
         $key = (string) Configuration::get('BMGLASS_API_KEY');
-        if (strpos($key, 'bmp_live_') !== 0) {
+        if ((strpos($key, 'bmg_live_') !== 0 && strpos($key, 'bmp_live_') !== 0)) {
             return array(); // Test key: connection checks only; never a fake sandbox checkout.
         }
         $currency = new Currency((int) $params['cart']->id_currency);

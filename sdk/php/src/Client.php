@@ -10,9 +10,11 @@ namespace BMaGlass\Sdk;
  * Python SDKs wrap.
  *
  * Auth: an API key created in the BMaGlass Pay app, sent in the
- * X-Api-Key header. bmp_live_ keys move real money; bmp_test_ keys
- * are READ-ONLY — BMaGlass Pay has no test-mode ledger, so a test
- * key can never move money. Write attempts with a test key fail with
+ * X-Api-Key header. Keys carry their environment: bmg_live_ (legacy
+ * bmp_live_) keys move real money; bmg_sandbox_ (legacy bmp_test_)
+ * keys run on mainnet formats with simulated money — sandbox invoices
+ * and payment links settle only through the simulate-payment
+ * endpoints. Real-money write attempts with a sandbox key fail with
  * a typed 403 `test_mode_read_only` (see ApiException::userMessage()).
  *
  * This package lives in the BMaGlass Pay repository (sdk/php). It is
@@ -33,15 +35,15 @@ class Client
     private $transport;
 
     /**
-     * @param string        $apiKey    bmp_live_... or bmp_test_... key.
+     * @param string        $apiKey    bmg_live_..., bmg_sandbox_... or legacy bmp_ key.
      * @param string|null   $baseUrl   API base override (tests).
      * @param callable|null $transport HTTP transport override (tests).
      */
     public function __construct($apiKey, $baseUrl = null, $transport = null)
     {
-        if (!is_string($apiKey) || strpos($apiKey, 'bmp_') !== 0) {
+        if (!is_string($apiKey) || (strpos($apiKey, 'bmg_') !== 0 && strpos($apiKey, 'bmp_') !== 0)) {
             throw new ApiException(0, 'invalid_api_key',
-                'api_key must be a BMaGlass Pay API key (bmp_live_... or bmp_test_...).');
+                'api_key must be a BMaGlass Pay API key (bmg_live_..., bmg_sandbox_..., or a legacy bmp_ key).');
         }
         $this->apiKey = $apiKey;
         $this->baseUrl = rtrim($baseUrl ? $baseUrl : self::DEFAULT_BASE, '/');
@@ -49,9 +51,16 @@ class Client
     }
 
     /** 'live' or 'test', from the key prefix — same rule as the other SDKs. */
+    /** Legacy mode name, from the key alone — same rule as the other SDKs. */
     public function mode()
     {
-        return strpos($this->apiKey, 'bmp_live_') === 0 ? 'live' : 'test';
+        return strpos($this->apiKey, '_live_') !== false ? 'live' : 'test';
+    }
+
+    /** 'production' or 'sandbox', derived ONLY from the key — never from a setting. */
+    public function environment()
+    {
+        return $this->mode() === 'live' ? 'production' : 'sandbox';
     }
 
     public function isLive()
@@ -84,6 +93,58 @@ class Client
 
     // ── Endpoints ────────────────────────────────────────────────
 
+    /**
+     * GET /connector/config — everything a connector renders from:
+     * this key's environment, the business's country/currency/status,
+     * feature states (mobile_money is enabled only for businesses
+     * registered in Zambia with the feature switched on) and the
+     * settlement type. Authenticated by the key alone.
+     */
+    public function connectorConfig()
+    {
+        return $this->request('GET', 'connector/config');
+    }
+
+    /** GET /invoices — invoices in the key's environment only. */
+    public function listInvoices()
+    {
+        return $this->request('GET', 'invoices');
+    }
+
+    /** GET /invoices/{id} (404 across environments, by design). */
+    public function getInvoice($invoiceId)
+    {
+        return $this->request('GET', 'invoices/' . rawurlencode((string) $invoiceId));
+    }
+
+    /** POST /invoices — create an invoice in the key's environment. */
+    public function createInvoice($amount, $currency = 'ZMW', $description = null, $customerEmail = null)
+    {
+        $body = array('amount' => $amount, 'currency' => self::assertSupportedCurrency($currency));
+        if ($description !== null) $body['description'] = $description;
+        if ($customerEmail !== null) $body['customer_email'] = $customerEmail;
+        return $this->request('POST', 'invoices', $body);
+    }
+
+    /**
+     * POST /invoices/{id}/simulate-payment — sandbox only: drive a
+     * sandbox invoice to paid (fires invoice.paid, flagged simulated).
+     */
+    public function simulateInvoicePayment($invoiceId)
+    {
+        return $this->request('POST', 'invoices/' . rawurlencode((string) $invoiceId) . '/simulate-payment');
+    }
+
+    /**
+     * POST /payment-links/{id}/simulate-payment — sandbox only: mark
+     * one simulated payment on a sandbox link (fires payment_link.paid,
+     * flagged simulated).
+     */
+    public function simulatePaymentLinkPayment($linkId)
+    {
+        return $this->request('POST', 'payment-links/' . rawurlencode((string) $linkId) . '/simulate-payment');
+    }
+
     /** GET /wallets — the key owner's wallets with balances. */
     public function wallets()
     {
@@ -98,7 +159,7 @@ class Client
     }
 
     /**
-     * POST /transfers — wallet-to-wallet transfer (live keys only;
+     * POST /transfers — wallet-to-wallet transfer (production keys only;
      * 1.5% fee charged on top by the API, exactly like the app).
      */
     public function createTransfer($toUserId, $amount, $currency = 'ZMW', $description = null, $recipientName = null, $idempotencyKey = null)
@@ -121,8 +182,9 @@ class Client
     }
 
     /**
-     * POST /payment-links — create a hosted payment link (live keys
-     * only). Returns the row including link_code; the buyer-facing
+     * POST /payment-links — create a hosted payment link in the
+     * key's environment (sandbox links settle only by simulation).
+     * Returns the row including link_code; the buyer-facing
      * URL is self::paymentLinkUrl($row['link_code']).
      */
     public function createPaymentLink($title, $amount = null, $currency = 'ZMW', $description = null, $expiresAt = null)

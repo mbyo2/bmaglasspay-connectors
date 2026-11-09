@@ -11,12 +11,12 @@ exactly that: a public hosted payment page
 (`https://bmaglasspay.online/pay/<code>`) where the buyer pays from
 their own BMaGlass wallet. Your **API key is a secret** and must
 never appear in a web page — the script actively refuses to render
-if it detects a `bmp_...` key in its configuration.
+if it detects a `bmg_...` / `bmp_...` API key in its configuration.
 
 ## Steps
 
 1. **Create a payment link** — in the BMaGlass Pay app (Payment
-   Links) or via the developer API (`POST /payment-links`, live key).
+   Links) or via the developer API (`POST /payment-links`, production key).
    Set the exact amount and currency (ZMW or USD).
 2. **Add the placeholder** where the button should appear:
 

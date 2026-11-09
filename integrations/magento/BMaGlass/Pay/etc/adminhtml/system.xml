@@ -13,7 +13,7 @@
                 </field>
                 <field id="api_key" translate="label comment" type="obscure" sortOrder="30" showInDefault="1">
                     <label>BMaGlass API key</label>
-                    <comment>From BMaGlass Pay (Business settings or API page). Test keys (bmp_test_...) are read-only — checkout requires a live key (bmp_live_...). Save, then use the store's connectivity: the method only appears when the key can read your wallets.</comment>
+                    <comment>From BMaGlass Pay (Business settings or API page). Sandbox keys (bmg_sandbox_..., legacy bmp_test_...) use simulated money — checkout requires a production key (bmg_live_..., legacy bmp_live_...). The connector configures itself from the key: environment and feature availability (including mobile money for businesses registered in Zambia) are read from your BMaGlass account. Save, then use the store's connectivity: the method only appears when the key can read your wallets.</comment>
                     <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
                 </field>
                 <field id="webhook_secret" translate="label comment" type="obscure" sortOrder="40" showInDefault="1">

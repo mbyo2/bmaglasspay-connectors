@@ -19,17 +19,21 @@ class BMaGlass {
   final String _baseUrl;
   final http.Client _http;
 
-  /// "live" or "test", from the key prefix — same rule as the other SDKs.
+  /// Legacy mode name, from the key alone — same rule as the other SDKs.
   final String mode;
+
+  /// "production" or "sandbox", derived ONLY from the key.
+  final String environment;
 
   BMaGlass({required String apiKey, String? baseUrl, http.Client? httpClient})
       : _apiKey = apiKey,
         _baseUrl = (baseUrl ?? defaultBase).replaceAll(RegExp(r'/$'), ''),
         _http = httpClient ?? http.Client(),
-        mode = apiKey.startsWith('bmp_live_') ? 'live' : 'test' {
-    if (!apiKey.startsWith('bmp_')) {
+        mode = apiKey.contains('_live_') ? 'live' : 'test',
+        environment = apiKey.contains('_live_') ? 'production' : 'sandbox' {
+    if (!apiKey.startsWith('bmg_') && !apiKey.startsWith('bmp_')) {
       throw const BMaGlassException(
-          0, 'invalid_api_key', 'apiKey must be a BMaGlass Pay API key (bmp_live_... or bmp_test_...).');
+          0, 'invalid_api_key', 'apiKey must be a BMaGlass Pay API key (bmg_live_..., bmg_sandbox_..., or a legacy bmp_ key).');
     }
   }
 
@@ -97,6 +101,45 @@ class BMaGlass {
     return parsed;
   }
 
+  /// GET /connector/config — the environment, business country/
+  /// currency/status, feature states (mobile_money — Zambia) and
+  /// settlement type for this key's business. Key-only auth.
+  Future<Map<String, dynamic>> connectorConfig() async {
+    return await _request('GET', 'connector/config') as Map<String, dynamic>;
+  }
+
+  /// GET /invoices — invoices in the key's environment only.
+  Future<List<Map<String, dynamic>>> listInvoices() async {
+    final data = await _request('GET', 'invoices') as List<dynamic>;
+    return data.map((e) => e as Map<String, dynamic>).toList();
+  }
+
+  /// POST /invoices — create an invoice in the key's environment.
+  Future<Map<String, dynamic>> createInvoice({
+    required num amount,
+    String currency = 'ZMW',
+    String? description,
+    String? customerEmail,
+  }) async {
+    final body = <String, dynamic>{
+      'amount': amount,
+      'currency': assertSupportedCurrency(currency),
+    };
+    if (description != null) body['description'] = description;
+    if (customerEmail != null) body['customer_email'] = customerEmail;
+    return await _request('POST', 'invoices', body: body) as Map<String, dynamic>;
+  }
+
+  /// POST /invoices/{id}/simulate-payment — sandbox only.
+  Future<Map<String, dynamic>> simulateInvoicePayment(String invoiceId) async {
+    return await _request('POST', 'invoices/${Uri.encodeComponent(invoiceId)}/simulate-payment') as Map<String, dynamic>;
+  }
+
+  /// POST /payment-links/{id}/simulate-payment — sandbox only.
+  Future<Map<String, dynamic>> simulatePaymentLinkPayment(String linkId) async {
+    return await _request('POST', 'payment-links/${Uri.encodeComponent(linkId)}/simulate-payment') as Map<String, dynamic>;
+  }
+
   /// GET /wallets — the key owner's wallets with balances.
   Future<List<Wallet>> wallets() async {
     final data = await _request('GET', 'wallets') as List<dynamic>;
@@ -110,7 +153,7 @@ class BMaGlass {
     return data.map((e) => e as Map<String, dynamic>).toList();
   }
 
-  /// POST /transfers — wallet-to-wallet transfer (live keys only;
+  /// POST /transfers — wallet-to-wallet transfer (production keys only;
   /// 1.5% fee charged on top by the API, exactly like the app).
   Future<Map<String, dynamic>> createTransfer({
     required String toUserId,

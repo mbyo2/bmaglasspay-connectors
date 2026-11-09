@@ -28,7 +28,7 @@ class PaymentTransaction(models.Model):
             # (see payment_provider.py for why 20.0 gates here rather
             # than on the provider's state): a test key may check the
             # connection and read wallets, but it can never take a
-            # payment — BMaGlass has no test-mode ledger.
+            # payment — sandbox keys use simulated money.
             raise BMaGlassError(0, "test_mode_read_only", TEST_MODE_MESSAGE)
         expires = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
         link = client.create_payment_link(

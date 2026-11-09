@@ -5,7 +5,7 @@
         "connectionLabel": "BMaGlass Pay account",
         "fields": [
             {
-                "helpText": "A key from BMaGlass Pay (bmp_live_... moves real money; bmp_test_... is read-only). Use a scoped key.",
+                "helpText": "A key from BMaGlass Pay (bmg_live_... moves real money; bmg_sandbox_... uses simulated money; legacy bmp_ keys keep working). Use a scoped key.",
                 "key": "api_key",
                 "label": "API key",
                 "required": true
@@ -22,7 +22,7 @@
     "creates": {
         "create_payment_link": {
             "display": {
-                "description": "Creates a hosted BMaGlass payment link. Live keys only \u2014 test keys are read-only by design. Currencies: ZMW, USD.",
+                "description": "Creates a hosted BMaGlass payment link in the key's environment (a sandbox key creates a sandbox link). Currencies: ZMW, USD.",
                 "label": "Create Payment Link"
             },
             "key": "create_payment_link",

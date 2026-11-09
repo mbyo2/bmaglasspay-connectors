@@ -1,8 +1,11 @@
 """BMaGlass Pay Developer API client (Python).
 
-Auth: an API key created in the BMaGlass Pay app. ``bmp_live_`` keys
-move real money; ``bmp_test_`` keys are read-only — this app has no
-test-mode ledger, so a test key can never move money.
+Auth: an API key created in the BMaGlass Pay app. Keys carry their
+environment: ``bmg_live_`` (legacy ``bmp_live_``) = production, real
+money; ``bmg_sandbox_`` (legacy ``bmp_test_``) = sandbox — mainnet
+formats, simulated money; sandbox payments settle only through the
+simulate-payment endpoints. The environment comes from the key alone
+(``client.environment``); nothing else can override it.
 """
 from __future__ import annotations
 
@@ -26,12 +29,15 @@ class BMaGlassError(Exception):
 
 class BMaGlass:
     def __init__(self, api_key: str, base_url: str = DEFAULT_BASE, session: Optional[requests.Session] = None):
-        if not api_key or not api_key.startswith("bmp_"):
-            raise BMaGlassError(0, "invalid_api_key", "api_key must be a BMaGlass Pay API key (bmp_live_... or bmp_test_...).")
+        if not api_key or not (api_key.startswith("bmg_") or api_key.startswith("bmp_")):
+            raise BMaGlassError(0, "invalid_api_key", "api_key must be a BMaGlass Pay API key (bmg_live_..., bmg_sandbox_..., or a legacy bmp_ key).")
         self.api_key = api_key
         self.mode = "live" if "_live_" in api_key else "test"
+        self.environment = "production" if self.mode == "live" else "sandbox"
         self.base_url = base_url.rstrip("/")
         self.session = session or requests.Session()
+        self.connector = _Connector(self)
+        self.invoices = _Invoices(self)
         self.wallets = _Wallets(self)
         self.transactions = _Transactions(self)
         self.transfers = _Transfers(self)
@@ -54,6 +60,28 @@ class BMaGlass:
             raise BMaGlassError(res.status_code, parsed.get("error", "request_failed"),
                                 parsed.get("message", f"Request failed with HTTP {res.status_code}"))
         return parsed.get("data", parsed)
+
+
+class _Connector:
+    """Connector configuration, authenticated by the key alone.
+
+    Returns the environment, the business's country/currency/status,
+    feature states (mobile_money is enabled only for businesses
+    registered in Zambia with the feature switched on) and the
+    settlement type — what a plugin renders its settings from.
+    """
+    def __init__(self, c: BMaGlass): self.c = c
+    def config(self): return self.c._request("GET", "connector/config")
+
+
+class _Invoices:
+    def __init__(self, c: BMaGlass): self.c = c
+    def list(self): return self.c._request("GET", "invoices")
+    def get(self, invoice_id: str): return self.c._request("GET", f"invoices/{invoice_id}")
+    def create(self, amount: float, **kwargs): return self.c._request("POST", "invoices", {"amount": amount, **kwargs})
+    def simulate_payment(self, invoice_id: str):
+        """Sandbox only: drive a sandbox invoice to paid (fires invoice.paid, flagged simulated)."""
+        return self.c._request("POST", f"invoices/{invoice_id}/simulate-payment")
 
 
 class _Wallets:
@@ -83,6 +111,9 @@ class _PaymentLinks:
     def list(self): return self.c._request("GET", "payment-links")
     def create(self, title: str, **kwargs): return self.c._request("POST", "payment-links", {"title": title, **kwargs})
     def attempts(self, link_id: str): return self.c._request("GET", f"payment-links/{link_id}/attempts")
+    def simulate_payment(self, link_id: str):
+        """Sandbox only: mark one simulated payment on a sandbox link (fires payment_link.paid, flagged simulated)."""
+        return self.c._request("POST", f"payment-links/{link_id}/simulate-payment")
 
 
 class _Settings:

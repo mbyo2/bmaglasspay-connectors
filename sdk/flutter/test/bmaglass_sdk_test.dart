@@ -17,7 +17,7 @@ import 'package:test/test.dart';
 http.Client stubClient() {
   return MockClient((req) async {
     final key = req.headers['x-api-key'] ?? '';
-    if (!key.startsWith('bmp_')) {
+    if (!key.startsWith('bmp_') && !key.startsWith('bmg_')) {
       return http.Response(jsonEncode({'error': 'invalid_api_key', 'message': 'nope'}), 401);
     }
     if (req.url.path.endsWith('/settings')) {
@@ -49,7 +49,7 @@ http.Client stubClient() {
           200);
     }
     if (req.url.path.endsWith('/payment-links') && req.method == 'POST') {
-      if (key.startsWith('bmp_test_')) {
+      if (key.startsWith('bmp_test_') || key.startsWith('bmg_sandbox_')) {
         return http.Response(
             jsonEncode({'error': 'test_mode_read_only', 'message': 'Test keys are read-only'}), 403);
       }
@@ -93,6 +93,8 @@ void main() {
     test('mode from prefix', () {
       expect(BMaGlass(apiKey: 'bmp_test_contract', httpClient: stubClient()).mode, 'test');
       expect(BMaGlass(apiKey: 'bmp_live_contract', httpClient: stubClient()).mode, 'live');
+      expect(BMaGlass(apiKey: 'bmg_sandbox_contract', httpClient: stubClient()).environment, 'sandbox');
+      expect(BMaGlass(apiKey: 'bmg_live_contract', httpClient: stubClient()).environment, 'production');
     });
     test('foreign key rejected', () {
       expect(() => BMaGlass(apiKey: 'sk_live_nope', httpClient: stubClient()),
@@ -127,7 +129,7 @@ void main() {
       } on BMaGlassException catch (e) {
         expect(e.code, 'test_mode_read_only');
         expect(e.isTestModeReadOnly, isTrue);
-        expect(e.userMessage(), contains('no test-mode ledger'));
+        expect(e.userMessage(), contains('sandbox key'));
       }
     });
     test('unsupported currency refused client-side', () async {

@@ -28,7 +28,7 @@ or simply copy `src/` into your project and register the
 use BMaGlass\Sdk\Client;
 use BMaGlass\Sdk\ApiException;
 
-$client = new Client(getenv('BMAGLASS_API_KEY')); // bmp_live_... or bmp_test_...
+$client = new Client(getenv('BMAGLASS_API_KEY')); // bmg_live_... or bmg_sandbox_... (legacy bmp_ keys work)
 
 $wallets = $client->wallets();                       // your real wallets + balances
 $link    = $client->createPaymentLink('Order #7', 250.00, 'ZMW');
@@ -48,9 +48,10 @@ $event = Client::parseWebhookEvent(file_get_contents('php://input'),
 
 ## Honest limits
 
-- **Test keys are read-only.** BMaGlass Pay has no test-mode ledger,
-  so `bmp_test_` keys can read and register webhooks but can never
-  move money; writes fail with a typed `403 test_mode_read_only`.
+- **Sandbox keys use simulated money.** Sandbox keys (`bmg_sandbox_`,
+  legacy `bmp_test_`) can read, create sandbox objects, settle them via
+  simulation and register webhooks, but can never move real money;
+  real-money writes fail with a typed `403 test_mode_read_only`.
 - **Currencies:** ZMW and USD — the currencies BMaGlass wallets
   hold. Anything else throws `unsupported_currency`; no exchange
   rate is ever invented.

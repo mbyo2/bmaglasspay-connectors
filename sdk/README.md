@@ -12,10 +12,14 @@ Contract: `openapi.json` in this directory (also served by the app at `/openapi.
   `Client::verifyWebhookSignature` / `Client::parseWebhookEvent`. Lifted from the WooCommerce
   plugin's client. Test: `php sdk/php/tests/run-tests.php`.
 - `flutter/` — `bmaglass_sdk` (Dart): equivalent client for Flutter apps. See its README.
-  Test: `dart test` (or `flutter test`) — passes 9/9, `dart analyze` clean (verified 2026-10-27, Dart 3.13.7).
+  Test: `dart test` (or `flutter test`) — passes 10/10, `dart analyze` clean (verified 2026-11-09, Dart 3.13.7).
 - `react-native/` — `@bmaglass/sdk-react-native`: equivalent client for React Native / Expo apps.
   See its README.
 
-Honest limits: test keys (`bmp_test_…`) are read-only — this app has no test-mode ledger, so test
-keys can never move money. The SDKs are in-repo only; they are not published to npm, PyPI, Packagist
-or pub.dev yet.
+Environments: keys carry their environment — production (`bmg_live_…`, legacy `bmp_live_…`) moves
+real money; sandbox (`bmg_sandbox_…`, legacy `bmp_test_…`) runs on mainnet formats with simulated
+money. Every SDK exposes `environment` (derived from the key only) plus `connectorConfig()` /
+`connector.config()` for the auto-configuration payload, invoice methods, and the sandbox
+simulate-payment methods. A live conformance runner lives at `tests/conformance.live.mjs` (QA keys
+via environment variables). Honest limits: sandbox keys can never move real money. The SDKs are
+in-repo only; they are not published to npm, PyPI, Packagist or pub.dev yet.

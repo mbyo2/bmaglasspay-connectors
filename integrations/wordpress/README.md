@@ -86,9 +86,11 @@ from it directly and reconciliation remains as the safety net.
 
 ## Honest limits
 
-- **Test keys are read-only** (platform-wide design: no test-mode
-  ledger). Settings + connection checks work with a test key;
-  checkout refuses with a plain-language explanation.
+- **Sandbox keys use simulated money** (platform-wide design).
+  Settings + connection checks work with a sandbox key, and the
+  connection check renders your connector configuration from BMaGlass
+  (environment, business country, mobile-money availability for
+  businesses registered in Zambia); checkout refuses with a plain-language explanation.
 - **Currencies:** ZMW and USD only — the currencies BMaGlass wallets
   hold. Other store currencies are refused at checkout with an
   explanation; no exchange rate is ever invented.

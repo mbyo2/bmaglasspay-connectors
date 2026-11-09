@@ -6,8 +6,19 @@ outside developers build against **this** repo, not the BMaGlass Pay app itself.
 
 Every artefact here connects a store, app or automation to the merchant's
 existing BMaGlass Pay account — the same account and the same wallets
-(ZMW / USD / BTC) — using an API key (`bmp_live_…` / `bmp_test_…`) issued
-from the BMaGlass Pay dashboard.
+(ZMW / USD / BTC) — using an API key issued from the BMaGlass Pay dashboard.
+
+**API key environments (2026-11-09).** Keys carry their environment with
+them: production keys (`bmg_live_…`; legacy `bmp_live_…` keys keep working)
+move real money; sandbox keys (`bmg_sandbox_…`; legacy `bmp_test_…`) run on
+mainnet formats with simulated money — sandbox invoices and payment links
+settle only through the API's simulate-payment endpoints and never touch a
+real wallet. The environment comes from the key alone; no plugin setting
+can override it. On connection, every connector calls
+`GET /connector/config` with the pasted key and configures itself from the
+response: the business's country and currency, its environment, and its
+feature states — including mobile money, which is available to businesses
+registered in Zambia (shown as a Zambia-only feature everywhere else).
 
 - Developer docs: https://bmaglasspay.online/developers
 - Live API contract (OpenAPI): https://bmaglasspay.online/openapi.json
@@ -52,9 +63,10 @@ proves every PHP connector variant's vendored API client is identical to the PHP
 
 ## Honest limits
 
-- Test keys (`bmp_test_…`) are **read-only by design** — BMaGlass Pay has no
-  test-mode ledger, so test keys can read wallets/transactions and manage
-  webhooks, but can never move money. Live keys move real money.
+- Sandbox keys can never move real money: they create segregated sandbox
+  objects and settle them only via simulation (the hosted checkout refuses
+  sandbox payment links). Real-money transfers attempted with a sandbox key
+  answer `403 test_mode_read_only`. Production keys move real money.
 - The SDKs are distributed from this repository only; they are **not yet
   published** to npm, PyPI, Packagist or pub.dev.
 - Amounts and currencies are never silently converted: a connector refuses a

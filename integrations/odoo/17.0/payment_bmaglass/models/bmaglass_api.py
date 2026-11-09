@@ -8,10 +8,12 @@ surface, error codes and webhook scheme are identical to the other
 SDKs — including the shared HMAC known-answer test vector.
 
 Auth: an API key created in the BMaGlass Pay app (X-Api-Key header).
-bmp_live_ keys move real money; bmp_test_ keys are READ-ONLY —
-BMaGlass Pay has no test-mode ledger, so a test key can never move
-money. Write attempts with a test key fail with 403
-``test_mode_read_only`` and are mapped to plain language below.
+Keys carry their environment: bmg_live_ (legacy bmp_live_) keys move
+real money; bmg_sandbox_ (legacy bmp_test_) keys run on mainnet
+formats with simulated money — sandbox invoices and payment links
+settle only through the simulate-payment endpoints. Real-money write
+attempts with a sandbox key fail with 403 ``test_mode_read_only`` and
+are mapped to plain language below.
 """
 import hashlib
 import hmac
@@ -25,10 +27,9 @@ SITE_BASE = "https://bmaglasspay.online"
 SUPPORTED_CURRENCIES = ("ZMW", "USD")
 
 TEST_MODE_MESSAGE = (
-    "This BMaGlass API key is a test key. Test keys can check the connection "
-    "and read wallets, but they can't take payments — BMaGlass Pay has no "
-    "test-mode ledger, so a test key can never move money. Use a live key "
-    "(bmp_live_...) to accept payments."
+    "This BMaGlass API key is a sandbox key. Sandbox keys can check the "
+    "connection, read wallets and run simulated payments, but they can't "
+    "move real money. Use a production key (bmg_live_...) to accept payments."
 )
 
 
@@ -135,10 +136,10 @@ class BMaGlassClient:
     """Thin typed client over the developer API (mirrors sdk/python)."""
 
     def __init__(self, api_key, base_url=DEFAULT_BASE, opener=None):
-        if not api_key or not str(api_key).startswith("bmp_"):
+        if not api_key or not (str(api_key).startswith("bmg_") or str(api_key).startswith("bmp_")):
             raise BMaGlassError(
                 0, "invalid_api_key",
-                "api_key must be a BMaGlass Pay API key (bmp_live_... or bmp_test_...).",
+                "api_key must be a BMaGlass Pay API key (bmg_live_..., bmg_sandbox_..., or a legacy bmp_ key).",
             )
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
@@ -146,7 +147,12 @@ class BMaGlassClient:
 
     @property
     def mode(self):
-        return "live" if self.api_key.startswith("bmp_live_") else "test"
+        return "live" if "_live_" in self.api_key else "test"
+
+    @property
+    def environment(self):
+        """'production' or 'sandbox', derived ONLY from the key."""
+        return "production" if self.mode == "live" else "sandbox"
 
     @property
     def is_live(self):
@@ -217,6 +223,32 @@ class BMaGlassClient:
             )
 
     # -- endpoints -----------------------------------------------------
+    def connector_config(self):
+        """GET /connector/config — the environment, business country/
+        currency/status, feature states (mobile_money is enabled only
+        for businesses registered in Zambia with the feature on) and
+        settlement type for THIS key's business. Key-only auth."""
+        return self._request("GET", "connector/config")
+
+    def list_invoices(self):
+        return self._request("GET", "invoices")
+
+    def create_invoice(self, amount, currency="ZMW", description=None, customer_email=None):
+        body = {"amount": amount, "currency": assert_supported_currency(currency)}
+        if description is not None:
+            body["description"] = description
+        if customer_email is not None:
+            body["customer_email"] = customer_email
+        return self._request("POST", "invoices", body)
+
+    def simulate_invoice_payment(self, invoice_id):
+        """Sandbox only: drive a sandbox invoice to paid."""
+        return self._request("POST", "invoices/%s/simulate-payment" % invoice_id)
+
+    def simulate_payment_link_payment(self, link_id):
+        """Sandbox only: mark one simulated payment on a sandbox link."""
+        return self._request("POST", "payment-links/%s/simulate-payment" % link_id)
+
     def wallets(self):
         return self._request("GET", "wallets")
 

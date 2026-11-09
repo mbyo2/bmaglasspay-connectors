@@ -15,7 +15,7 @@ class ModelExtensionPaymentBmaglasspay extends Model
             return array();
         }
         $key = (string) $this->config->get('payment_bmaglasspay_api_key');
-        if (strpos($key, 'bmp_live_') !== 0) {
+        if ((strpos($key, 'bmg_live_') !== 0 && strpos($key, 'bmp_live_') !== 0)) {
             return array();
         }
         $currency = strtoupper((string) $this->session->data['currency']);

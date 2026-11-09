@@ -21,7 +21,7 @@ repo (e.g. as a file:/git dependency) or copy `src/` into your app.
 ```ts
 import { BMaGlass, BMaGlassError, parseWebhookEvent, paymentLinkUrl } from "@bmaglass/sdk-react-native";
 
-const client = new BMaGlass({ apiKey: process.env.BMGLASS_API_KEY! }); // bmp_live_... / bmp_test_...
+const client = new BMaGlass({ apiKey: process.env.BMGLASS_API_KEY! }); // bmg_live_... / bmg_sandbox_... (legacy bmp_ keys work)
 
 const wallets = await client.wallets.list();
 const link = await client.paymentLinks.create({ title: "Order #7", amount: 250, currency: "ZMW" });
@@ -36,11 +36,12 @@ try {
 
 ## Honest limits & security
 
-- **Test keys are read-only** (no test-mode ledger): reads and
-  webhook registration work; writes throw `test_mode_read_only`.
+- **Sandbox keys use simulated money**: reads, sandbox object
+  creation + simulation and webhook registration work; real-money
+  writes throw `test_mode_read_only`.
 - **Currencies:** ZMW and USD only; anything else throws
   `unsupported_currency` client-side — no FX rate is ever invented.
-- **API keys are secrets.** A `bmp_live_` key moves real money. In a
+- **API keys are secrets.** A production key (`bmg_live_`, legacy `bmp_live_`) moves real money. In a
   consumer app, prefer calling your own backend with the key held
   server-side; ship a key in an app binary only for the key owner's
   own account use (e.g. the merchant's own device).

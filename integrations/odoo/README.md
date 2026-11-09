@@ -30,9 +30,11 @@ Full landscape and sources: [`VERSIONS.md`](../../VERSIONS.md).
   webhook settles immediately (payload cross-checked before
   `_set_done()`); a 5-minute cron reconciliation is the fallback.
   Exactly-once on both paths.
-- **ZMW / USD only** and **live key required to take payments** —
-  test keys are read-only platform-wide (no test-mode ledger), and
-  no exchange rate is ever invented.
+- **ZMW / USD only** and **production key required to take payments** —
+  sandbox keys (`bmg_sandbox_…`, legacy `bmp_test_…`) use simulated money
+  platform-wide, and no exchange rate is ever invented. The module reads
+  its environment and feature availability from `GET /connector/config`
+  (see the vendored client's `connector_config()`).
 - The vendored API client (`models/bmaglass_api.py`) is
   **byte-identical across all five variants** — verified by
   [`check-clients.sh`](check-clients.sh) — and mirrors the Python

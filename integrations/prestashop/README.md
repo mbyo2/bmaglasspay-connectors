@@ -29,8 +29,8 @@ Full landscape and sources: [`VERSIONS.md`](../../VERSIONS.md).
   confirmed via the API and marked paid); the module configuration
   page's "Check pending orders" reconciliation is the fallback.
   Orders complete **exactly once**.
-- Wallet-to-wallet only (buyers need a BMaGlass account). Test
-  keys are read-only by design: connection checks only.
+- Wallet-to-wallet only (buyers need a BMaGlass account). Sandbox
+  keys use simulated money: connection checks and simulated payments only.
 - PrestaShop has no built-in cron: for hands-off operation, hit
   the module's reconcile action from your server cron, or rely on
   webhooks + normal admin visits.

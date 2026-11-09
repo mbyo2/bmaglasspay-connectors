@@ -10,7 +10,7 @@
  * page. A payment link is a public payment page — anyone with it can
  * view it and pay it (paying requires the buyer's own BMaGlass
  * wallet). Your API key is a SECRET and must never appear in a page:
- * this script actively refuses to run if it sees a bmp_ key in its
+ * this script actively refuses to run if it sees a bmg_/bmp_ API key in its
  * configuration.
  *
  * Usage:
@@ -36,7 +36,7 @@
     }
 
     function looksLikeSecret(value) {
-        return typeof value === 'string' && value.indexOf('bmp_') !== -1;
+        return typeof value === 'string' && (value.indexOf('bmg_') !== -1 || value.indexOf('bmp_') !== -1);
     }
 
     function render(placeholder) {
@@ -46,7 +46,7 @@
             if (looksLikeSecret(rawValues[i])) {
                 // Never render, never transmit. Keys are server-side only.
                 if (window.console) {
-                    console.error('[BMaGlass Pay] Refusing to render: an API key (bmp_...) was placed in the ' +
+                    console.error('[BMaGlass Pay] Refusing to render: an API key (bmg_.../bmp_...) was placed in the ' +
                         'embed configuration. API keys are secret and must never be embedded in a web page. ' +
                         'Create a payment link instead and use its public URL.');
                 }

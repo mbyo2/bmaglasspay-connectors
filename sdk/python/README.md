@@ -5,7 +5,7 @@ Python client for the BMaGlass Pay Developer API. Install: `pip install ./sdk/py
 ```python
 from bmaglass_sdk import BMaGlass, verify_webhook_signature
 
-client = BMaGlass("bmp_test_...")  # test keys are read-only
+client = BMaGlass("bmg_sandbox_...")  # sandbox keys use simulated money
 print(client.wallets.list())
 print(client.bitcoin.quote("buy", amount_zmw=100))
 

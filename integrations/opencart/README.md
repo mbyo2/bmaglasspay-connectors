@@ -29,8 +29,8 @@ Full landscape and sources: [`VERSIONS.md`](../../VERSIONS.md).
   `payment_link.paid` and reconciles that order immediately
   (confirmed via the API); polling reconciliation is the fallback.
   Orders complete **exactly once**.
-- Wallet-to-wallet only (buyers need a BMaGlass account); test
-  keys are read-only by design — connection check only.
+- Wallet-to-wallet only (buyers need a BMaGlass account); sandbox
+  keys use simulated money — connection check and simulated payments only.
 
 Per-version install steps and the exact platform differences are
 in each folder's README.

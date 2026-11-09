@@ -43,15 +43,15 @@ use.
 ### Action: "create a payment link"
 1. Action: **Webhooks by Zapier → POST**.
 2. URL: `https://hhxwwozpvgktuqutfkhc.supabase.co/functions/v1/developer-api/payment-links`
-3. Headers: `X-Api-Key: bmp_live_...` (use a key scoped to
+3. Headers: `X-Api-Key: bmg_live_...` (legacy bmp_live_ keys work too; use a key scoped to
    `payment_links:write` only) and `Content-Type: application/json`.
 4. Body (JSON): `{"title": "...", "amount": 250, "currency": "ZMW"}`
    — currencies are ZMW/USD only.
 5. The response contains `link_code`; the buyer URL is
    `https://bmaglasspay.online/pay/<link_code>` — chain a Formatter
    step to build it and pass it to your next action (email, SMS…).
-6. **Live keys only**: a test key answers `403 test_mode_read_only`
-   — by design, since there is no test-mode ledger.
+6. **Production keys for real writes**: a sandbox key (bmg_sandbox_...) creates sandbox objects and settles them only through the simulate-payment endpoints; real-money transfers with a sandbox key answer `403 test_mode_read_only`
+   — by design: sandbox money is simulated, never real.
 
 ### Signature verification (honest note)
 Zapier's native Catch Hook can't verify our HMAC signature. The

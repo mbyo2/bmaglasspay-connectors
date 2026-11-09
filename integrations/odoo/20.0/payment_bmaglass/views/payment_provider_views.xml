@@ -26,7 +26,7 @@
                         Register webhook points BMaGlass at this instance
                         (/payment/bmaglass/webhook) and stores the signing secret.
                         Enabling this provider requires a live key — BMaGlass test
-                        keys are read-only by design (no test-mode ledger).
+                        keys use simulated money by design — checkout needs a production key.
                     </p>
                 </div>
             </xpath>

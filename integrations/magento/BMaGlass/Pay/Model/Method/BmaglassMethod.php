@@ -39,7 +39,7 @@ class BmaglassMethod extends AbstractMethod
             $this->bmaglassConfig = \Magento\Framework\App\ObjectManager::getInstance()->get(Config::class);
         }
         $key = $this->bmaglassConfig->apiKey();
-        if ($key === '' || strpos($key, 'bmp_live_') !== 0) {
+        if ($key === '' || (strpos($key, 'bmg_live_') !== 0 && strpos($key, 'bmp_live_') !== 0)) {
             return false;
         }
         if ($quote !== null) {

@@ -35,10 +35,9 @@ class ApiException extends Exception
     {
         switch ($this->errorCode) {
             case 'test_mode_read_only':
-                return 'This BMaGlass API key is a test key. Test keys can check the '
-                    . 'connection and read wallets, but they can\'t take payments — '
-                    . 'BMaGlass Pay has no test-mode ledger, so a test key can never '
-                    . 'move money. Use a live key (bmp_live_...) to accept payments.';
+                return 'This BMaGlass API key is a sandbox key. Sandbox keys can check the '
+                        . 'connection, read wallets and run simulated payments, but they can\'t '
+                        . 'move real money. Use a production key (bmg_live_...) to accept payments.';
             case 'invalid_api_key':
             case 'api_key_revoked':
             case 'api_key_expired':

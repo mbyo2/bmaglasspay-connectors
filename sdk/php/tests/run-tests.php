@@ -30,8 +30,27 @@ $calls = array();
 $transport = function ($method, $url, $headers, $body) use (&$calls) {
     $calls[] = array('method' => $method, 'url' => $url, 'headers' => $headers, 'body' => $body);
     $flat = implode(' ', $headers);
-    if (strpos($flat, 'bmp_test_contract') === false && strpos($flat, 'bmp_live_contract') === false) {
+    if (strpos($flat, 'bmp_test_contract') === false && strpos($flat, 'bmp_live_contract') === false
+        && strpos($flat, 'bmg_sandbox_contract') === false && strpos($flat, 'bmg_live_contract') === false) {
         return array(401, json_encode(array('error' => 'invalid_api_key', 'message' => 'nope')));
+    }
+    if (str_ends_with($url, '/connector/config')) {
+        $sandbox = strpos($flat, 'sandbox') !== false || strpos($flat, 'bmp_test_') !== false;
+        return array(200, json_encode(array('data' => array(
+            'environment' => $sandbox ? 'sandbox' : 'production', 'livemode' => !$sandbox,
+            'key' => array('key_id' => 'k1', 'scopes' => array('config:read'), 'status' => 'active'),
+            'business' => array('display_name' => 'QA Store', 'country' => 'ZM', 'currency' => 'ZMW', 'status' => 'pending'),
+            'features' => array('mobile_money' => array('status' => 'disabled', 'reason_code' => null)),
+            'settlement' => array('type' => 'wallet', 'currency' => 'ZMW'),
+            'config_version' => 'abc123',
+        ), 'mode' => $sandbox ? 'test' : 'live')));
+    }
+    if (str_ends_with($url, '/invoices') && $method === 'POST') {
+        $req = json_decode($body, true);
+        return array(201, json_encode(array('data' => array('id' => 'inv1', 'amount' => $req['amount'], 'currency' => 'ZMW', 'status' => 'open', 'environment' => 'sandbox'), 'mode' => 'test')));
+    }
+    if (str_ends_with($url, '/invoices/inv1/simulate-payment')) {
+        return array(200, json_encode(array('data' => array('id' => 'inv1', 'status' => 'paid', 'environment' => 'sandbox'), 'mode' => 'test', 'simulated' => true)));
     }
     if (str_ends_with($url, '/wallets')) {
         return array(200, json_encode(array('data' => array(array('id' => 'w1', 'currency' => 'ZMW', 'balance' => 42)), 'mode' => 'test')));
@@ -58,6 +77,19 @@ $transport = function ($method, $url, $headers, $body) use (&$calls) {
 $test = new Client('bmp_test_contract', 'http://local.test', $transport);
 eq('test key mode', $test->mode(), 'test');
 eq('live key mode', (new Client('bmp_live_contract', 'http://local.test', $transport))->mode(), 'live');
+eq('bmg sandbox environment', (new Client('bmg_sandbox_contract', 'http://local.test', $transport))->environment(), 'sandbox');
+eq('bmg live environment', (new Client('bmg_live_contract', 'http://local.test', $transport))->environment(), 'production');
+eq('legacy test environment', $test->environment(), 'sandbox');
+
+$sandbox = new Client('bmg_sandbox_contract', 'http://local.test', $transport);
+$config = $sandbox->connectorConfig();
+eq('config environment', $config['environment'], 'sandbox');
+eq('config business country', $config['business']['country'], 'ZM');
+eq('config mobile money state', $config['features']['mobile_money']['status'], 'disabled');
+$inv = $sandbox->createInvoice(250, 'ZMW', 'Order 9');
+eq('invoice created open', $inv['status'], 'open');
+$paidInv = $sandbox->simulateInvoicePayment('inv1');
+eq('invoice simulated paid', $paidInv['status'], 'paid');
 try {
     new Client('sk_live_nope', 'http://local.test', $transport);
     check('non-bmaglass key rejected', false);
@@ -87,7 +119,7 @@ try {
     check('test-key write throws', false);
 } catch (ApiException $e) {
     eq('test-key code', $e->errorCode, 'test_mode_read_only');
-    check('userMessage honest', strpos($e->userMessage(), 'no test-mode ledger') !== false);
+    check('userMessage honest', strpos($e->userMessage(), 'sandbox key') !== false);
 }
 
 try {

@@ -41,11 +41,12 @@ final event = parseWebhookEvent(rawBody, signatureHeader, webhookSecret);
 
 ## Honest limits & security
 
-- **Test keys are read-only** (no test-mode ledger): reads work;
+- **Sandbox keys use simulated money**: reads work, sandbox invoices
+  and payment links can be created and settled via simulation; real-money
   writes throw `test_mode_read_only` with a plain-language message.
 - **Currencies:** ZMW and USD only; anything else throws
   `unsupported_currency` — no FX rate is ever invented.
-- **API keys are secrets.** A `bmp_live_` key moves real money. In a
+- **API keys are secrets.** A production key (`bmg_live_`, legacy `bmp_live_`) moves real money. In a
   consumer app, prefer your own backend holding the key server-side;
   embed a key only for the key owner's own account use.
 

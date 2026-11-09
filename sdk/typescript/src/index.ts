@@ -1,9 +1,13 @@
 /**
  * @bmaglass/sdk — typed client for the BMaGlass Pay Developer API.
  *
- * Auth: an API key created in the BMaGlass Pay app (bmp_live_… moves
- * real money; bmp_test_… is read-only — this app has no test-mode
- * ledger, so test keys can never move money).
+ * Auth: an API key created in the BMaGlass Pay app. Keys carry their
+ * environment with them: bmg_live_… (legacy bmp_live_…) = production,
+ * real money; bmg_sandbox_… (legacy bmp_test_…) = sandbox — mainnet
+ * formats, simulated money: sandbox invoices/payment links settle only
+ * through the simulate-payment endpoints and never touch a real
+ * wallet. The environment is read from the key alone (client.environment);
+ * no option can override it.
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
 
@@ -25,6 +29,15 @@ export interface WebhookEndpoint { id: string; url: string; events: string[]; is
 export interface WebhookDelivery { id: string; webhook_id: string | null; event_id: string; event_type: string; webhook_url: string; status: string; attempts: number; response_status: number | null; error_message: string | null; created_at: string }
 export interface BitcoinQuote { id: string; side: "buy" | "sell"; amount_zmw: number; amount_sats: number; fee_bps: number; fee_zmw: number; mid_rate_zmw: number; expires_at: string; created_at: string }
 export interface AccountSettings { fee_payer_default: "seller" | "buyer"; platform_fee_percent: number | null; paypal_platform_fee_percent: number | null; note: string }
+export interface FeatureState { status: "enabled" | "disabled" | "not_entitled" | "pending_verification"; reason_code: string | null }
+export interface ConnectorConfig {
+  environment: "sandbox" | "production"; livemode: boolean; config_version: string;
+  key: { key_id: string; scopes: string[]; status: string };
+  business: { display_name: string | null; country: string | null; currency: string | null; status: string };
+  features: { invoices: FeatureState; payment_links: FeatureState; bitcoin: FeatureState; transfers: FeatureState; mobile_money: FeatureState };
+  settlement: { type: string; currency: string | null };
+}
+export interface Invoice { id: string; amount: number; currency: string; description: string | null; customer_email: string | null; status: "open" | "paid" | "expired" | "cancelled"; environment: "sandbox" | "production"; livemode: boolean; metadata: Record<string, unknown>; paid_at: string | null; created_at: string }
 export interface PaymentLinkAttempt { id: string; fiat_amount: number | null; fiat_currency: string; fee_payer: string; fee_percent: number | null; fee_sats: number | null; amount_sats: number | null; required_sats: number | null; seen_sats: number | null; received_sats: number | null; status: string; onchain_address: string | null; lightning_invoice: string | null; expires_at: string | null; settled_at: string | null; created_at: string }
 
 export interface BMaGlassOptions {
@@ -37,17 +50,21 @@ export interface BMaGlassOptions {
 const DEFAULT_BASE = "https://hhxwwozpvgktuqutfkhc.supabase.co/functions/v1/developer-api";
 
 export class BMaGlass {
+  /** Legacy alias of `environment` ("live" ≡ production, "test" ≡ sandbox). */
   readonly mode: "test" | "live";
+  /** The environment, derived ONLY from the key — never from options. */
+  readonly environment: "sandbox" | "production";
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
 
   constructor(options: BMaGlassOptions) {
-    if (!options.apiKey?.startsWith("bmp_")) {
-      throw new BMaGlassError(0, "invalid_api_key", "apiKey must be a BMaGlass Pay API key (bmp_live_… or bmp_test_…).");
+    if (!/^(bmg|bmp)_/.test(options.apiKey ?? "")) {
+      throw new BMaGlassError(0, "invalid_api_key", "apiKey must be a BMaGlass Pay API key (bmg_live_…, bmg_sandbox_…, or a legacy bmp_ key).");
     }
     this.apiKey = options.apiKey;
     this.mode = options.apiKey.includes("_live_") ? "live" : "test";
+    this.environment = this.mode === "live" ? "production" : "sandbox";
     this.baseUrl = (options.baseUrl ?? DEFAULT_BASE).replace(/\/$/, "");
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
@@ -67,6 +84,23 @@ export class BMaGlass {
     return (parsed?.data ?? parsed) as T;
   }
 
+  /**
+   * Everything a connector renders from: this key's environment, the
+   * business's country/currency/status, feature states (mobile_money
+   * is enabled only for businesses registered in Zambia with the
+   * feature switched on; not_entitled otherwise) and the settlement
+   * type. Authenticated by the key alone — there is no business
+   * parameter. The response carries a config_version (ETag).
+   */
+  connectorConfig = () => this.request<ConnectorConfig>("GET", "connector/config");
+  invoices = {
+    list: () => this.request<Invoice[]>("GET", "invoices"),
+    get: (id: string) => this.request<Invoice>("GET", `invoices/${id}`),
+    create: (input: { amount: number; currency?: string; description?: string; customer_email?: string; metadata?: Record<string, unknown> }) =>
+      this.request<Invoice>("POST", "invoices", input),
+    /** Sandbox only: drive a sandbox invoice to paid (fires invoice.paid, flagged simulated). Production keys get 403 simulation_not_available. */
+    simulatePayment: (id: string) => this.request<Invoice & { simulated?: boolean }>("POST", `invoices/${id}/simulate-payment`),
+  };
   wallets = {
     list: () => this.request<Wallet[]>("GET", "wallets"),
   };
@@ -74,18 +108,20 @@ export class BMaGlass {
     list: (limit = 25) => this.request<Transaction[]>("GET", `transactions?limit=${limit}`),
   };
   transfers = {
-    /** Live keys only. Test keys receive a 403 test_mode_read_only BMaGlassError. */
+    /** Production keys only. Sandbox keys receive a 403 test_mode_read_only BMaGlassError. */
     create: (input: { to_user_id: string; amount: number; currency?: string; description?: string; recipient_name?: string }, idempotencyKey?: string) =>
       this.request<{ transaction_id: string; new_sender_balance: number }>("POST", "transfers", input,
         idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
   };
   paymentLinks = {
     list: () => this.request<PaymentLink[]>("GET", "payment-links"),
-    /** Live keys only. */
+    /** Creates a link in the key's environment; a sandbox key creates a sandbox link (the hosted checkout refuses those — settlement is simulation-only). */
     create: (input: { title: string; description?: string; amount?: number; currency?: string; expires_at?: string }) =>
       this.request<PaymentLink>("POST", "payment-links", input),
     /** A link's Bitcoin payment attempts (quote, sats received, status). */
     attempts: (id: string) => this.request<PaymentLinkAttempt[]>("GET", `payment-links/${id}/attempts`),
+    /** Sandbox only: mark one simulated payment on a sandbox link (fires payment_link.paid, flagged simulated). */
+    simulatePayment: (id: string) => this.request<PaymentLink & { simulated?: boolean }>("POST", `payment-links/${id}/simulate-payment`),
   };
   settings = {
     /** The merchant's fee-bearer default + the platform's current fee rates. Read-only; any valid key. */
@@ -94,7 +130,7 @@ export class BMaGlass {
   bitcoin = {
     balance: () => this.request<Array<{ asset: string; balance_sats: number; available_sats: number; updated_at: string }>>("GET", "bitcoin/balance"),
     depositAddress: () => this.request<{ address: string; derivation_path: string; is_active: boolean; created_at: string }>("GET", "bitcoin/deposit-address"),
-    /** Quote only — execution happens in the app. Works with test keys. */
+    /** Quote only — execution happens in the app. Works with sandbox keys. */
     quote: (input: { side: "buy" | "sell"; amount_zmw?: number; amount_sats?: number }) =>
       this.request<BitcoinQuote>("POST", "bitcoin/quote", input),
   };

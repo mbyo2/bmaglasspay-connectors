@@ -5,7 +5,7 @@ Typed TypeScript/JavaScript client for the BMaGlass Pay Developer API.
 ```ts
 import { BMaGlass, verifyWebhookSignature } from "@bmaglass/sdk";
 
-const client = new BMaGlass({ apiKey: "bmp_test_…" }); // test keys are read-only
+const client = new BMaGlass({ apiKey: "bmg_sandbox_…" }); // sandbox keys use simulated money
 const wallets = await client.wallets.list();
 const links = await client.paymentLinks.list();
 const quote = await client.bitcoin.quote({ side: "buy", amount_zmw: 100 });

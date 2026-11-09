@@ -81,7 +81,7 @@ class ClientTest(unittest.TestCase):
             self.test_client.create_payment_link("Nope", amount=5)
         self.assertEqual(ctx.exception.code, "test_mode_read_only")
         self.assertTrue(ctx.exception.is_test_mode_read_only)
-        self.assertIn("no test-mode ledger", ctx.exception.user_message())
+        self.assertIn("sandbox key", ctx.exception.user_message())
 
     def test_currency_guard_fires_before_transport(self):
         before = len(self.transport.calls)

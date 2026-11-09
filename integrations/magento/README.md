@@ -57,9 +57,9 @@ method to an unsupported platform.
    package with Composer from this repo).
 2. `bin/magento module:enable BMaGlass_Pay && bin/magento setup:upgrade && bin/magento cache:flush`
 3. **Stores → Configuration → Sales → Payment Methods → BMaGlass Pay:**
-   enable, paste your API key (live key required for checkout —
-   the method hides itself for test keys, because test keys are
-   read-only by design), register the webhook URL above in BMaGlass
+   enable, paste your API key (a production key — `bmg_live_…` or
+   legacy `bmp_live_…` — is required for checkout; the method hides
+   itself for sandbox keys, which use simulated money), register the webhook URL above in BMaGlass
    Pay and paste the signing secret shown once.
 4. Set your store currency to ZMW or USD for the store view where
    BMaGlass should appear (other currencies hide the method — no

@@ -28,8 +28,19 @@ class FakeSession:
 
     def request(self, method, url, headers=None, data=None, timeout=None):
         self.calls.append({"method": method, "url": url, "headers": headers, "data": data})
-        if headers.get("X-Api-Key") != "bmp_test_contract":
+        if headers.get("X-Api-Key") not in ("bmp_test_contract", "bmg_sandbox_contract"):
             return FakeResponse(401, {"error": "invalid_api_key", "message": "nope"})
+        if url.endswith("/connector/config"):
+            return FakeResponse(200, {"data": {
+                "environment": "sandbox", "livemode": False, "config_version": "abc123",
+                "key": {"key_id": "k1", "scopes": ["config:read"], "status": "active"},
+                "business": {"display_name": "QA Store", "country": "ZM", "currency": "ZMW", "status": "pending"},
+                "features": {"mobile_money": {"status": "disabled", "reason_code": None}},
+                "settlement": {"type": "wallet", "currency": "ZMW"}}, "mode": "test"})
+        if url.endswith("/invoices") and method == "POST":
+            return FakeResponse(201, {"data": {"id": "inv1", "amount": 250, "currency": "ZMW", "status": "open", "environment": "sandbox"}, "mode": "test"})
+        if url.endswith("/invoices/inv1/simulate-payment"):
+            return FakeResponse(200, {"data": {"id": "inv1", "status": "paid", "environment": "sandbox"}, "mode": "test", "simulated": True})
         if url.endswith("/wallets"):
             return FakeResponse(200, {"data": [{"id": "w1", "currency": "ZMW", "balance": 42}], "mode": "test"})
         if "/transactions" in url:
@@ -54,9 +65,24 @@ class SdkContractTest(unittest.TestCase):
 
     def test_mode_detection(self):
         self.assertEqual(self.client.mode, "test")
+        self.assertEqual(self.client.environment, "sandbox")
         self.assertEqual(BMaGlass("bmp_live_x", session=FakeSession()).mode, "live")
+        self.assertEqual(BMaGlass("bmp_live_x", session=FakeSession()).environment, "production")
+        self.assertEqual(BMaGlass("bmg_sandbox_x", session=FakeSession()).environment, "sandbox")
+        self.assertEqual(BMaGlass("bmg_live_x", session=FakeSession()).environment, "production")
         with self.assertRaises(BMaGlassError):
             BMaGlass("sk_live_nope")
+
+    def test_connector_config_and_sandbox_invoices(self):
+        client = BMaGlass("bmg_sandbox_contract", base_url="http://local.test", session=self.session)
+        config = client.connector.config()
+        self.assertEqual(config["environment"], "sandbox")
+        self.assertEqual(config["business"]["country"], "ZM")
+        self.assertEqual(config["features"]["mobile_money"]["status"], "disabled")
+        inv = client.invoices.create(250, currency="ZMW", description="Order 9")
+        self.assertEqual(inv["status"], "open")
+        paid = client.invoices.simulate_payment("inv1")
+        self.assertEqual(paid["status"], "paid")
 
     def test_wallets_sends_key_header(self):
         wallets = self.client.wallets.list()

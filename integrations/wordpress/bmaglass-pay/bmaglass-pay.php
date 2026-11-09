@@ -266,10 +266,31 @@ add_action('admin_post_bmaglass_test_connection', function () {
         foreach ((array) $wallets as $w) {
             $parts[] = sprintf('%s %s', $w['currency'], number_format((float) $w['balance'], 2));
         }
-        $mode = $client->mode();
-        $msg = sprintf('Connected to BMaGlass Pay (%s key). Wallets: %s.', $mode, implode(' · ', $parts));
-        if ($mode === 'test') {
-            $msg .= ' This is a TEST key: connection and reads work, but checkout can\'t take payments with it — BMaGlass test keys are read-only by design. Switch to a live key to sell.';
+        $environment = $client->environment();
+        $msg = sprintf('Connected to BMaGlass Pay (%s). Wallets: %s.', ucfirst($environment), implode(' · ', $parts));
+        // Render the connector configuration the key unlocked: the
+        // business's country and its feature states come from the
+        // account, never from a plugin setting.
+        try {
+            $config = $client->connectorConfig();
+            $country = isset($config['business']['country']) ? $config['business']['country'] : null;
+            if ($country) {
+                $msg .= sprintf(' Business country: %s.', $country);
+            }
+            $mm = isset($config['features']['mobile_money']['status']) ? $config['features']['mobile_money']['status'] : null;
+            if ($mm === 'enabled') {
+                $msg .= ' Mobile money: on.';
+            } elseif ($mm === 'not_entitled') {
+                $msg .= ' Mobile money: available to businesses registered in Zambia.';
+            } elseif ($mm === 'disabled') {
+                $msg .= ' Mobile money: off — switch it on in your BMaGlass business settings.';
+            }
+        } catch (BMaGlassApiException $e) {
+            // The wallet read already proved the connection; config is
+            // presentation on top — never fail the check on it.
+        }
+        if ($environment === 'sandbox') {
+            $msg .= ' This is a SANDBOX key: connection and reads work and payments can be simulated, but checkout can\'t take real payments with it. Switch to a production key to sell.';
         }
         bmaglass_admin_redirect($msg);
     } catch (BMaGlassApiException $e) {

@@ -15,7 +15,7 @@ confirmed instantly by BMaGlass's signed payment_link.paid
 webhook, with scheduled API reconciliation as the fallback.
 
 Honest limits: a live API key is required to take payments (test
-keys are read-only across BMaGlass Pay — there is no test-mode
+keys use simulated money across BMaGlass Pay — sandbox payments never move real money, and there is no test-mode
 ledger); only ZMW and USD transactions are supported, because those
 are the currencies BMaGlass wallets hold.
 """,

@@ -20,7 +20,7 @@ class PaymentProvider(models.Model):
         string="BMaGlass API key",
         help="Create a key in BMaGlass Pay (Business settings or the API page) with the "
              "wallets:read, payment_links:read and payment_links:write scopes. "
-             "A live key (bmp_live_...) is required to take payments.",
+             "A production key (bmg_live_...) is required to take payments.",
         groups="base.group_system",
     )
     bmaglass_webhook_id = fields.Char(string="BMaGlass webhook ID", readonly=True)
@@ -61,14 +61,14 @@ class PaymentProvider(models.Model):
 
         A test key may sit on a provider in Odoo's 'test' state for
         connection checks, but it can never take a payment — BMaGlass
-        has no test-mode ledger — so 'enabled' demands bmp_live_.
+        uses simulated money — so 'enabled' demands a production key (bmg_live_ or bmp_live_).
         """
         for provider in self:
             if provider.code != "bmaglass":
                 continue
             if provider.state == "enabled":
                 key = (provider.bmaglass_api_key or "").strip()
-                if not key.startswith("bmp_live_"):
+                if not (key.startswith("bmg_live_") or key.startswith("bmp_live_")):
                     raise ValidationError(TEST_MODE_MESSAGE)
 
     # -- settings actions -------------------------------------------------

@@ -20,7 +20,7 @@ class PaymentProvider(models.Model):
         string="BMaGlass API key",
         help="Create a key in BMaGlass Pay (Business settings or the API page) with the "
              "wallets:read, payment_links:read and payment_links:write scopes. "
-             "A live key (bmp_live_...) is required to take payments.",
+             "A production key (bmg_live_...) is required to take payments.",
         groups="base.group_system",
     )
     bmaglass_webhook_id = fields.Char(string="BMaGlass webhook ID", readonly=True)
@@ -90,10 +90,10 @@ class PaymentProvider(models.Model):
             if provider.code != "bmaglass":
                 continue
             key = (provider.bmaglass_api_key or "").strip()
-            if key and not key.startswith("bmp_"):
+            if key and not (key.startswith("bmg_") or key.startswith("bmp_")):
                 raise ValidationError(
                     "That doesn't look like a BMaGlass API key — BMaGlass "
-                    "keys start with bmp_live_ or bmp_test_.")
+                    "keys start with bmg_live_ or bmg_sandbox_ (legacy bmp_ keys still work).")
 
     # -- settings actions -------------------------------------------------
     def action_bmaglass_test_connection(self):

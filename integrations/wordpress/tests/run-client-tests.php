@@ -67,6 +67,8 @@ $transport = function ($method, $url, $headers, $body) use (&$calls) {
 $test = new BMaGlassClient('bmp_test_contract', 'http://local.test', $transport);
 eq('test key mode', $test->mode(), 'test');
 eq('live key mode', (new BMaGlassClient('bmp_live_contract', 'http://local.test', $transport))->mode(), 'live');
+eq('bmg sandbox environment', (new BMaGlassClient('bmg_sandbox_contract', 'http://local.test', $transport))->environment(), 'sandbox');
+eq('bmg live environment', (new BMaGlassClient('bmg_live_contract', 'http://local.test', $transport))->environment(), 'production');
 try {
     new BMaGlassClient('sk_live_nope', 'http://local.test', $transport);
     check('non-bmaglass key rejected', false);
@@ -102,7 +104,7 @@ try {
     eq('test-key write status', $e->status, 403);
     eq('test-key write code', $e->errorCode, 'test_mode_read_only');
     check('isTestModeReadOnly', $e->isTestModeReadOnly());
-    check('userMessage is honest about test keys', strpos($e->userMessage(), 'no test-mode ledger') !== false);
+    check('userMessage is honest about test keys', strpos($e->userMessage(), 'sandbox key') !== false);
 }
 
 // ── Currency guard (no transport call allowed) ───────────────────────

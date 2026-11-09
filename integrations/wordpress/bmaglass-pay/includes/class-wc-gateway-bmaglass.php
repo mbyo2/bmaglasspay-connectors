@@ -72,9 +72,10 @@ class WC_Gateway_BMaGlass extends WC_Payment_Gateway
                 'title' => 'API key',
                 'type' => 'password',
                 'description' => 'Create a key in BMaGlass Pay (Business settings or the API page) with the payment_links '
-                    . 'and wallets scopes. A live key (bmp_live_...) is required to take payments. A test key '
-                    . '(bmp_test_...) can only check the connection and read wallets — BMaGlass Pay has no test-mode '
-                    . 'ledger, so a test key can never move money.',
+                    . 'and wallets scopes. A production key (bmg_live_...) is required to take payments. A sandbox key '
+                    . '(bmg_sandbox_...) runs the integration with simulated money — it can never move real money. '
+                    . 'Older bmp_ keys keep working. The plugin configures itself from the key: paste it, test the '
+                    . 'connection, and your environment and available features are read from your BMaGlass account.',
             ),
             'webhook_id' => array(
                 'title' => 'Webhook ID',
@@ -140,10 +141,12 @@ class WC_Gateway_BMaGlass extends WC_Payment_Gateway
                         <button type="submit" class="button">Register webhook</button>
                     </form>
                     <p class="description">
-                        Save your API key first, then test the connection. Register webhook points BMaGlass at
+                        Save your API key first, then test the connection — it also reads your connector
+                        configuration from BMaGlass (environment, business country and feature availability,
+                        including mobile money for businesses registered in Zambia). Register webhook points BMaGlass at
                         <code><?php echo esc_html($webhookUrl); ?></code> and stores the signing secret here.
-                        With a test key the connection check works (wallets are read), but checkout stays
-                        disabled for payments — test keys are read-only by design.
+                        With a sandbox key the connection check works and payments can be simulated, but checkout
+                        stays disabled for real payments — sandbox keys use simulated money by design.
                     </p>
                 </td>
             </tr>
@@ -175,11 +178,13 @@ class WC_Gateway_BMaGlass extends WC_Payment_Gateway
             return array('result' => 'failure');
         }
 
-        // Honest test-mode refusal, before touching the API.
+        // Honest sandbox refusal, before touching the API: a sandbox
+        // key (from the key itself — no setting can override it) runs
+        // on simulated money, so real checkout can never run with it.
         if (!$client->isLive()) {
             wc_add_notice(
-                'This store\'s BMaGlass key is a test key, which can\'t take payments. The store owner needs to '
-                . 'switch to a live BMaGlass key before checkout can run.',
+                'This store\'s BMaGlass key is a sandbox key, which can\'t take real payments. The store owner needs to '
+                . 'switch to a production BMaGlass key before checkout can run.',
                 'error'
             );
             return array('result' => 'failure');
