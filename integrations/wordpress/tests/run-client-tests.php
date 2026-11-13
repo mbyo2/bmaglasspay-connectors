@@ -60,6 +60,27 @@ $transport = function ($method, $url, $headers, $body) use (&$calls) {
     if (str_ends_with($url, '/payment-links/link1/attempts')) {
         return array(200, json_encode(array('data' => array(array('id' => 'att1', 'status' => 'waiting')), 'mode' => 'test')));
     }
+    if (strpos($url, '/mobile-money/collections') !== false && $method === 'POST') {
+        $req = json_decode($body, true);
+        return array(201, json_encode(array('data' => array(
+            'reference' => 'BMG-TESTCOLL1', 'merchant_reference' => isset($req['reference']) ? $req['reference'] : null,
+            'collection_id' => 'col1', 'transaction_id' => null, 'amount' => $req['amount'],
+            'currency' => 'ZMW', 'operator' => isset($req['operator']) ? $req['operator'] : 'mtn',
+            'phone' => $req['phone'], 'status' => 'pending', 'failure_reason' => null,
+            'environment' => 'production', 'livemode' => true, 'wallet_balance' => null,
+            'settled_at' => null, 'created_at' => '2026-11-12T00:00:00Z',
+        ), 'mode' => 'live')));
+    }
+    if (strpos($url, '/mobile-money/collections/') !== false && $method === 'GET') {
+        return array(200, json_encode(array('data' => array(
+            'reference' => 'BMG-TESTCOLL1', 'merchant_reference' => 'woo-order-7',
+            'collection_id' => 'col1', 'transaction_id' => 'tx-momo-1', 'amount' => 100,
+            'currency' => 'ZMW', 'operator' => 'mtn', 'phone' => '0961111111',
+            'status' => 'successful', 'failure_reason' => null, 'environment' => 'production',
+            'livemode' => true, 'wallet_balance' => 142.5, 'settled_at' => '2026-11-12T00:01:00Z',
+            'created_at' => '2026-11-12T00:00:00Z',
+        ), 'mode' => 'live')));
+    }
     return array(404, json_encode(array('error' => 'not_found', 'message' => 'no route')));
 };
 
@@ -122,6 +143,24 @@ eq('guard fired before transport', count($calls), $before);
 $live->createTransfer('user-2', 25, 'ZMW', 'desc', null, 'idem-42');
 $last = end($calls);
 check('Idempotency-Key header sent', strpos(implode(' ', $last['headers']), 'Idempotency-Key: idem-42') !== false);
+
+// ── Mobile money collections ─────────────────────────────────────────
+$collection = $live->createMobileMoneyCollection(100, '0961111111', null, 'woo-order-7');
+eq('collection reference returned', $collection['reference'], 'BMG-TESTCOLL1');
+eq('collection starts pending', $collection['status'], 'pending');
+$last = end($calls);
+check('collection POST path', str_ends_with($last['url'], '/mobile-money/collections') && $last['method'] === 'POST');
+$sentBody = json_decode($last['body'], true);
+eq('collection amount shaped', (float) $sentBody['amount'], 100.0);
+eq('collection phone sent', $sentBody['phone'], '0961111111');
+eq('collection merchant reference sent', $sentBody['reference'], 'woo-order-7');
+check('operator omitted when null (API detects it)', !isset($sentBody['operator']));
+
+$settled = $live->getMobileMoneyCollection('BMG-TESTCOLL1');
+eq('collection settles on poll', $settled['status'], 'successful');
+eq('collection wallet balance reported', $settled['wallet_balance'], 142.5);
+$last = end($calls);
+check('collection GET path', str_ends_with($last['url'], '/mobile-money/collections/BMG-TESTCOLL1') && $last['method'] === 'GET');
 
 // ── Webhook create returns one-time secret ───────────────────────────
 $hook = $live->createWebhook('https://example.com/hook', array('transaction.completed'));

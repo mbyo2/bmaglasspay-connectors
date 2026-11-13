@@ -8,12 +8,20 @@
 //   BMG_QA_KE_SANDBOX   sandbox key for a non-Zambian QA business
 //   BMG_QA_KE_REVOKED   a revoked key (must fail closed, 401)
 //   BMG_QA_ZM_TOGGLE    "on" if the Zambian business has mobile money on
+//   BMG_QA_ZM_NOCONN    (optional) live key for a Zambian QA business
+//                       with mobile money on but NO connection saved
+//   BMG_QA_ZM_MOMO_LIVE (optional) "on" when the Zambian business's
+//                       PRODUCTION mobile-money connection is backed
+//                       by the sandbox gateway (api_base_url override),
+//                       making a production-key collection safe to run
 //
 // Covers: config fetch + rendering inputs, environment derivation and
 // segregation, the mobile-money gate matrix, sandbox simulated
-// settlement (invoice + payment link), and refusal cases. Exits
-// non-zero on any failure. QA accounts only — never run this with a
-// real merchant's keys: it creates sandbox objects and one production
+// settlement (invoice + payment link), live mobile-money collections
+// through the developer API (create, settle, idempotent replay,
+// merchant-reference lookup), and refusal cases. Exits non-zero on
+// any failure. QA accounts only — never run this with a real
+// merchant's keys: it creates sandbox objects and one production
 // invoice on the key's own account.
 import assert from "node:assert";
 import { BMaGlass, BMaGlassError } from "../typescript/dist/index.js";
@@ -63,6 +71,51 @@ check("sandbox invoice simulated to paid", paid.status === "paid" && paid.paid_a
 const link = await zmSandbox.paymentLinks.create({ title: "conformance link", amount: 21, currency: "ZMW" });
 const linkPaid = await zmSandbox.paymentLinks.simulatePayment(link.id);
 check("sandbox link simulated payment counted", linkPaid.payment_count === 1 && Number(linkPaid.total_collected) === 21);
+
+// ── Mobile money collections through the API (SDK) ──
+// The Zambian business is connected (sandbox connection, gateway
+// test numbers — no real phone is charged). MTN 0961111111 is the
+// gateway's always-succeeds test number.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const pollCollection = async (client, reference) => {
+  let c = await client.mobileMoney.getCollection(reference);
+  for (let i = 0; i < 40 && c.status === "pending"; i++) {
+    await sleep(3000);
+    c = await client.mobileMoney.getCollection(reference);
+  }
+  return c;
+};
+const mmCreated = await zmSandbox.mobileMoney.createCollection({
+  amount: 100, phone: "0961111111", reference: "conformance-momo-1",
+});
+check("sandbox mobile money collection created pending",
+  mmCreated.status === "pending" && mmCreated.merchant_reference === "conformance-momo-1" && mmCreated.environment === "sandbox");
+const mmSettled = await pollCollection(zmSandbox, mmCreated.reference);
+check("sandbox mobile money collection settles on poll", mmSettled.status === "successful");
+check("settled collection carries its ledger transaction", typeof mmSettled.transaction_id === "string" && mmSettled.transaction_id.length > 0);
+const mmReplay = await zmSandbox.mobileMoney.createCollection({
+  amount: 100, phone: "0961111111", reference: "conformance-momo-1",
+});
+check("create replay returns the same collection (idempotent)", mmReplay.reference === mmCreated.reference);
+const mmByRef = await zmSandbox.mobileMoney.getCollection("conformance-momo-1");
+check("collection readable by merchant reference", mmByRef.reference === mmCreated.reference && mmByRef.status === "successful");
+await assert.rejects(() => keSandbox.mobileMoney.createCollection({ amount: 100, phone: "0961111111", reference: "conformance-momo-ke" }),
+  (e) => e instanceof BMaGlassError && e.status === 403 && e.code === "not_entitled");
+check("non-ZM create refused (403 not_entitled)", true);
+if (process.env.BMG_QA_ZM_NOCONN) {
+  const noconn = new BMaGlass({ apiKey: process.env.BMG_QA_ZM_NOCONN });
+  await assert.rejects(() => noconn.mobileMoney.createCollection({ amount: 100, phone: "0961111111", reference: "conformance-momo-nc" }),
+    (e) => e instanceof BMaGlassError && e.status === 400 && e.code === "not_configured");
+  check("unconnected merchant create refused (400 not_configured)", true);
+}
+if (process.env.BMG_QA_ZM_MOMO_LIVE === "on") {
+  const mmLive = await zmLive.mobileMoney.createCollection({
+    amount: 100, phone: "0961111111", reference: "conformance-momo-live-1",
+  });
+  const mmLiveSettled = await pollCollection(zmLive, mmLive.reference);
+  check("production-key collection settles (sandbox-backed connection)",
+    mmLive.environment === "production" && mmLiveSettled.status === "successful");
+}
 
 // ── Segregation through the SDK ──
 await assert.rejects(() => zmLive.invoices.get(inv.id),

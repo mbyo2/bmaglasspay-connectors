@@ -49,9 +49,10 @@ $event = Client::parseWebhookEvent(file_get_contents('php://input'),
 ## Honest limits
 
 - **Sandbox keys use simulated money.** Sandbox keys (`bmg_sandbox_`,
-  legacy `bmp_test_`) can read, create sandbox objects, settle them via
-  simulation and register webhooks, but can never move real money;
-  real-money writes fail with a typed `403 test_mode_read_only`.
+  legacy `bmp_test_`) can read, create sandbox objects, and settle them via
+  simulation, but can never move real money; webhook registration needs a
+  production key (sandbox keys get a typed `403 test_mode_read_only`).
+  Real-money writes fail with a typed `403 test_mode_read_only`.
 - **Currencies:** ZMW and USD — the currencies BMaGlass wallets
   hold. Anything else throws `unsupported_currency`; no exchange
   rate is ever invented.

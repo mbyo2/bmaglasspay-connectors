@@ -2,8 +2,8 @@
 /**
  * Plugin Name:       BMaGlass Pay for WooCommerce
  * Plugin URI:        https://bmaglasspay.online/developers
- * Description:       Accept BMaGlass Pay payments in WooCommerce — buyers pay wallet-to-wallet on a hosted BMaGlass payment page, and the money lands in the same BMaGlass wallets (ZMW / USD) as your app account. Built on the BMaGlass Pay developer API.
- * Version:           1.1.1
+ * Description:       Accept BMaGlass Pay payments in WooCommerce — buyers pay wallet-to-wallet on a hosted BMaGlass payment page, and the money lands in the same BMaGlass wallets (ZMW / USD) as your app account. Stores whose BMaGlass account has mobile money connected also get a Mobile Money gateway (MTN / Airtel / Zamtel). Built on the BMaGlass Pay developer API.
+ * Version:           1.2.0
  * Author:            BMaGlass Pay
  * License:           GPL-2.0-or-later
  * Text Domain:       bmaglass-pay
@@ -25,7 +25,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('BMAGLASS_PAY_VERSION', '1.1.0');
+define('BMAGLASS_PAY_VERSION', '1.2.0');
 define('BMAGLASS_PAY_DIR', plugin_dir_path(__FILE__));
 
 require_once BMAGLASS_PAY_DIR . 'includes/class-bmaglass-api-client.php';
@@ -78,6 +78,8 @@ add_action('woocommerce_blocks_payment_method_type_registration', function ($reg
     }
     require_once BMAGLASS_PAY_DIR . 'includes/class-bmaglass-blocks-integration.php';
     $registry->register(new BMaGlass_Blocks_Integration());
+    require_once BMAGLASS_PAY_DIR . 'includes/class-bmaglass-momo-blocks-integration.php';
+    $registry->register(new BMaGlass_Momo_Blocks_Integration());
 });
 
 add_action('init', function () {
@@ -88,11 +90,19 @@ add_action('init', function () {
         BMAGLASS_PAY_VERSION,
         true
     );
+    wp_register_script(
+        'bmaglass-momo-blocks-integration',
+        plugins_url('assets/js/momo-blocks-integration.js', __FILE__),
+        array('wc-blocks-registry', 'wc-settings', 'wp-element'),
+        BMAGLASS_PAY_VERSION,
+        true
+    );
 });
 
 // ── Gateway registration ─────────────────────────────────────────────
 add_filter('woocommerce_payment_gateways', function ($gateways) {
     $gateways[] = 'WC_Gateway_BMaGlass';
+    $gateways[] = 'WC_Gateway_BMaGlass_Mobile_Money';
     return $gateways;
 });
 
@@ -104,6 +114,7 @@ add_action('plugins_loaded', function () {
         return;
     }
     require_once BMAGLASS_PAY_DIR . 'includes/class-wc-gateway-bmaglass.php';
+    require_once BMAGLASS_PAY_DIR . 'includes/class-wc-gateway-bmaglass-momo.php';
 });
 
 // ── Reconciliation cron (every 5 minutes) ────────────────────────────
@@ -127,12 +138,17 @@ add_action('bmaglass_reconcile_orders', array('BMaGlass_Reconciler', 'reconcile_
 // Immediate check when the buyer lands back on the thank-you page.
 add_action('woocommerce_thankyou', function ($order_id) {
     $order = wc_get_order($order_id);
-    if (!$order || $order->get_payment_method() !== 'bmaglass') {
+    if (!$order) {
         return;
     }
     $client = bmaglass_client_from_settings();
-    if ($client !== null) {
+    if ($client === null) {
+        return;
+    }
+    if ($order->get_payment_method() === 'bmaglass') {
         BMaGlass_Reconciler::reconcile_order($order, $client);
+    } elseif ($order->get_payment_method() === 'bmaglass_momo') {
+        BMaGlass_Reconciler::reconcile_momo_order($order, $client);
     }
 }, 20);
 
@@ -141,8 +157,22 @@ add_filter('woocommerce_order_actions', function ($actions, $order) {
     if ($order && $order->get_payment_method() === 'bmaglass' && $order->get_meta('_bmaglass_link_code')) {
         $actions['bmaglass_check_payment'] = 'Check BMaGlass payment';
     }
+    if ($order && $order->get_payment_method() === 'bmaglass_momo' && $order->get_meta('_bmaglass_momo_reference')) {
+        $actions['bmaglass_check_momo_payment'] = 'Check mobile money payment';
+    }
     return $actions;
 }, 10, 2);
+
+add_action('woocommerce_order_action_bmaglass_check_momo_payment', function ($order) {
+    $client = bmaglass_client_from_settings();
+    if ($client === null) {
+        $order->add_order_note('BMaGlass: no API key configured — settlement check skipped.');
+        return;
+    }
+    if (!BMaGlass_Reconciler::reconcile_momo_order($order, $client)) {
+        $order->add_order_note('BMaGlass mobile money: checked just now — the collection hasn\'t settled yet.');
+    }
+});
 
 add_action('woocommerce_order_action_bmaglass_check_payment', function ($order) {
     $client = bmaglass_client_from_settings();
@@ -216,6 +246,33 @@ function bmaglass_handle_webhook(WP_REST_Request $request)
             }
             $logger->info(
                 'BMaGlass payment_link.paid: link ' . $paidCode . ($paidSettled ? ' — order settled.' : ' — no unsettled order matched (already settled or unknown link).'),
+                array('source' => 'bmaglass-pay')
+            );
+            break;
+        case 'mobile_money.collection.completed':
+            // A mobile-money collection started at checkout settled:
+            // complete the matching order now (cross-checked against
+            // the order's amount/currency), with API reconciliation
+            // as the fallback for that order.
+            $momoData = isset($event['data']) && is_array($event['data']) ? $event['data'] : array();
+            $momoRef = isset($momoData['merchant_reference']) ? (string) $momoData['merchant_reference'] : '';
+            $momoSettled = false;
+            if ($momoRef !== '') {
+                $momoSettled = BMaGlass_Reconciler::complete_momo_order_from_event(
+                    $momoRef,
+                    isset($momoData['amount']) ? $momoData['amount'] : 0,
+                    isset($momoData['currency']) ? $momoData['currency'] : ''
+                );
+                if (!$momoSettled) {
+                    $momoOrder = BMaGlass_Reconciler::find_order_by_momo_merchant_reference($momoRef);
+                    $momoClient = bmaglass_client_from_settings();
+                    if ($momoOrder && $momoClient !== null) {
+                        $momoSettled = BMaGlass_Reconciler::reconcile_momo_order($momoOrder, $momoClient);
+                    }
+                }
+            }
+            $logger->info(
+                'BMaGlass mobile_money.collection.completed: ' . $momoRef . ($momoSettled ? ' — order settled.' : ' — no unsettled order matched (already settled or unknown reference).'),
                 array('source' => 'bmaglass-pay')
             );
             break;
@@ -321,7 +378,7 @@ add_action('admin_post_bmaglass_register_webhook', function () {
         }
         $hook = $client->createWebhook(
             rest_url('bmaglass/v1/webhook'),
-            array('transaction.completed', 'payment_link.created', 'payment_link.paid', 'webhook.test')
+            array('transaction.completed', 'payment_link.created', 'payment_link.paid', 'mobile_money.collection.completed', 'webhook.test')
         );
         $s['webhook_id'] = isset($hook['id']) ? $hook['id'] : '';
         if (!empty($hook['secret'])) {

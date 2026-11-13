@@ -182,7 +182,8 @@ class BMaGlass {
     return data.map((e) => PaymentLink.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  /// POST /payment-links — create a hosted payment link (live keys only).
+  /// POST /payment-links — create a hosted payment link (sandbox keys
+  /// create links too; only settlement is simulation-only).
   Future<PaymentLink> createPaymentLink({
     required String title,
     double? amount,
@@ -205,6 +206,42 @@ class BMaGlass {
   Future<List<Map<String, dynamic>>> paymentLinkAttempts(String linkId) async {
     final data = await _request('GET', 'payment-links/${Uri.encodeComponent(linkId)}/attempts') as List<dynamic>;
     return data.map((e) => e as Map<String, dynamic>).toList();
+  }
+
+  /// POST /mobile-money/collections — start a mobile money collection
+  /// on the business's own connected mobile money account (Zambia,
+  /// ZMW): the customer approves the prompt on their phone (MTN,
+  /// Airtel or Zamtel). The key's environment selects which
+  /// connection is used — a sandbox key runs against the sandbox
+  /// connection (gateway test numbers; no real phone is ever
+  /// charged), a production key against the production connection.
+  /// [reference] is your own reference for the collection and doubles
+  /// as the idempotency key: repeating a create with the same
+  /// reference returns the original collection instead of charging
+  /// the customer twice. Requires the mobile_money:create scope.
+  Future<Map<String, dynamic>> createMobileMoneyCollection({
+    required num amount,
+    required String phone,
+    String? operator,
+    String? reference,
+  }) async {
+    final body = <String, dynamic>{
+      'amount': amount,
+      'phone': phone,
+      if (operator != null) 'operator': operator,
+      if (reference != null) 'reference': reference,
+    };
+    return await _request('POST', 'mobile-money/collections', body: body) as Map<String, dynamic>;
+  }
+
+  /// GET /mobile-money/collections/{reference} — a collection's
+  /// current state, by platform reference (BMG-...) or your own
+  /// reference. Polling refreshes from the rail: a settled collection
+  /// credits the business's ZMW wallet in full and fires
+  /// mobile_money.collection.completed. Requires the
+  /// mobile_money:read scope.
+  Future<Map<String, dynamic>> getMobileMoneyCollection(String reference) async {
+    return await _request('GET', 'mobile-money/collections/${Uri.encodeComponent(reference)}') as Map<String, dynamic>;
   }
 
   /// GET /settings — the merchant's fee-bearer default

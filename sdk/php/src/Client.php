@@ -2,6 +2,11 @@
 
 namespace BMaGlass\Sdk;
 
+// Standalone use (no Composer autoloader): the client throws ApiException
+// on every error path, so load it here. require_once is a no-op when
+// Composer already autoloaded the class.
+require_once __DIR__ . '/ApiException.php';
+
 /**
  * BMaGlass Pay Developer API client (PHP).
  *
@@ -200,6 +205,42 @@ class Client
     public function paymentLinkAttempts($linkId)
     {
         return $this->request('GET', 'payment-links/' . rawurlencode((string) $linkId) . '/attempts');
+    }
+
+    /**
+     * POST /mobile-money/collections — start a mobile money
+     * collection on the business's own connected mobile money
+     * account (Zambia, ZMW): the customer approves the prompt on
+     * their phone (MTN, Airtel or Zamtel). The key's environment
+     * selects which connection is used — a sandbox key runs against
+     * the sandbox connection (gateway test numbers; no real phone is
+     * ever charged), a production key against the production
+     * connection. $reference is your own reference for the collection
+     * and doubles as the idempotency key: repeating a create with the
+     * same reference returns the original collection instead of
+     * charging the customer twice. Gate errors: 400
+     * business_not_set_up / not_configured, 403 not_entitled /
+     * business_inactive. Requires the mobile_money:create scope.
+     */
+    public function createMobileMoneyCollection($amount, $phone, $operator = null, $reference = null)
+    {
+        $body = array('amount' => round((float) $amount, 2), 'phone' => (string) $phone);
+        if ($operator !== null) $body['operator'] = $operator;
+        if ($reference !== null) $body['reference'] = $reference;
+        return $this->request('POST', 'mobile-money/collections', $body);
+    }
+
+    /**
+     * GET /mobile-money/collections/{reference} — a collection's
+     * current state, by platform reference (BMG-...) or your own
+     * reference. Polling refreshes from the rail: a settled
+     * collection credits the business's ZMW wallet in full and fires
+     * mobile_money.collection.completed. Requires the
+     * mobile_money:read scope.
+     */
+    public function getMobileMoneyCollection($reference)
+    {
+        return $this->request('GET', 'mobile-money/collections/' . rawurlencode((string) $reference));
     }
 
     /**

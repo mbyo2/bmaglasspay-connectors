@@ -62,6 +62,7 @@ export interface Transaction { uuid_id: string; amount: number; currency: string
 export interface PaymentLink { id: string; title: string; description: string | null; amount: number | null; currency: string; link_code: string; status: string; payment_count: number; total_collected: number; expires_at: string | null; created_at: string }
 export interface WebhookEndpoint { id: string; url: string; events: string[]; is_active: boolean; created_at: string; secret?: string }
 export interface WebhookDelivery { id: string; webhook_id: string; event_id: string; event_type: string; webhook_url: string; status: string; attempts: number; response_status: number | null; error_message: string | null; created_at: string }
+export interface MobileMoneyCollection { reference: string; merchant_reference: string | null; collection_id: string; transaction_id: string | null; amount: number; currency: string; operator: "mtn" | "airtel" | "zamtel"; phone: string; status: "pending" | "successful" | "failed"; failure_reason: string | null; environment: "sandbox" | "production"; livemode: boolean; wallet_balance: number | null; settled_at: string | null; created_at: string }
 
 export function paymentLinkUrl(linkCode: string): string {
   return `${SITE_BASE}/pay/${encodeURIComponent(linkCode)}`;
@@ -152,6 +153,23 @@ export class BMaGlass {
     attempts: (id: string) => this.request<unknown[]>("GET", `payment-links/${id}/attempts`),
     /** Sandbox only: mark one simulated payment on a sandbox link (fires payment_link.paid, flagged simulated). */
     simulatePayment: (id: string) => this.request<Record<string, unknown>>("POST", `payment-links/${id}/simulate-payment`),
+  };
+  mobileMoney = {
+    /**
+     * Start a mobile money collection on the business's connected
+     * mobile money account (Zambia, ZMW): the customer approves the
+     * prompt on their phone (MTN, Airtel or Zamtel). The key's
+     * environment selects which connection is used — a sandbox key
+     * runs against the sandbox connection (gateway test numbers; no
+     * real phone is ever charged). `reference` is your own reference
+     * for the collection and doubles as the idempotency key.
+     * Requires the mobile_money:create scope.
+     */
+    createCollection: (input: { amount: number; phone: string; operator?: "mtn" | "airtel" | "zamtel"; reference?: string; idempotency_key?: string }) =>
+      this.request<MobileMoneyCollection>("POST", "mobile-money/collections", input),
+    /** A collection's current state, by platform reference (BMG-…) or your own reference. Requires mobile_money:read. */
+    getCollection: (reference: string) =>
+      this.request<MobileMoneyCollection>("GET", `mobile-money/collections/${encodeURIComponent(reference)}`),
   };
   settings = {
     /** The merchant's fee-bearer default + the platform's current fee rates. Read-only; any valid key. */

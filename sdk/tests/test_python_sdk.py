@@ -55,6 +55,15 @@ class FakeSession:
             return FakeResponse(200, {"data": {"fee_payer_default": "seller", "platform_fee_percent": 2.5, "paypal_platform_fee_percent": 1, "note": "n"}, "mode": "test"})
         if url.endswith("/payment-links/link1/attempts"):
             return FakeResponse(200, {"data": [{"id": "att1", "status": "waiting"}], "mode": "test"})
+        if url.endswith("/mobile-money/collections") and method == "POST":
+            req = json.loads(data or "{}")
+            return FakeResponse(201, {"data": {"reference": "BMG-C1", "merchant_reference": req.get("reference"),
+                                               "amount": req.get("amount"), "phone": req.get("phone"),
+                                               "operator": req.get("operator", "mtn"), "status": "pending",
+                                               "environment": "sandbox"}, "mode": "test"})
+        if url.endswith("/mobile-money/collections/BMG-C1") and method == "GET":
+            return FakeResponse(200, {"data": {"reference": "BMG-C1", "merchant_reference": "order-42",
+                                               "status": "successful", "wallet_balance": 99}, "mode": "test"})
         return FakeResponse(404, {"error": "not_found", "message": "no route"})
 
 
@@ -100,6 +109,17 @@ class SdkContractTest(unittest.TestCase):
         self.assertEqual(self.client.bitcoin.balance()[0]["balance_sats"], 1000)
         hook = self.client.webhooks.create("https://example.com/hook")
         self.assertEqual(hook["secret"], "whsec_testsecret")
+
+    def test_mobile_money_collections(self):
+        coll = self.client.mobile_money.create_collection(100, "0961111111", reference="order-42")
+        self.assertEqual(coll["status"], "pending")
+        self.assertEqual(coll["reference"], "BMG-C1")
+        self.assertEqual(coll["merchant_reference"], "order-42")
+        sent = json.loads(self.session.calls[-1]["data"])
+        self.assertEqual(sent, {"amount": 100, "phone": "0961111111", "reference": "order-42"})
+        settled = self.client.mobile_money.get_collection("BMG-C1")
+        self.assertEqual(settled["status"], "successful")
+        self.assertEqual(settled["wallet_balance"], 99)
 
     def test_settings_and_attempts(self):
         settings = self.client.settings.get()

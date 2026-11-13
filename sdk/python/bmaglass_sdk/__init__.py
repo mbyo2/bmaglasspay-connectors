@@ -42,6 +42,7 @@ class BMaGlass:
         self.transactions = _Transactions(self)
         self.transfers = _Transfers(self)
         self.payment_links = _PaymentLinks(self)
+        self.mobile_money = _MobileMoney(self)
         self.bitcoin = _Bitcoin(self)
         self.webhooks = _Webhooks(self)
         self.settings = _Settings(self)
@@ -114,6 +115,41 @@ class _PaymentLinks:
     def simulate_payment(self, link_id: str):
         """Sandbox only: mark one simulated payment on a sandbox link (fires payment_link.paid, flagged simulated)."""
         return self.c._request("POST", f"payment-links/{link_id}/simulate-payment")
+
+
+class _MobileMoney:
+    """Mobile money collections on the business's connected account.
+
+    Zambia / ZMW only. The key's environment selects which of the
+    business's connections is used — a sandbox key runs against the
+    sandbox connection (gateway test numbers; no real phone is ever
+    charged), a production key against the production connection.
+    """
+    def __init__(self, c: BMaGlass): self.c = c
+
+    def create_collection(self, amount: float, phone: str, operator: Optional[str] = None,
+                          reference: Optional[str] = None, idempotency_key: Optional[str] = None):
+        """Start a collection: the customer approves the prompt on
+        their phone (operator: "mtn" | "airtel" | "zamtel"; detected
+        from the number when omitted). ``reference`` is your own
+        reference for the collection and doubles as the idempotency
+        key — repeating a create with the same reference returns the
+        original collection instead of charging the customer twice.
+        Requires the mobile_money:create scope."""
+        body: dict[str, Any] = {"amount": amount, "phone": phone}
+        if operator is not None: body["operator"] = operator
+        if reference is not None: body["reference"] = reference
+        if idempotency_key is not None: body["idempotency_key"] = idempotency_key
+        return self.c._request("POST", "mobile-money/collections", body)
+
+    def get_collection(self, reference: str):
+        """A collection's current state, by platform reference
+        (BMG-...) or your own reference. Polling refreshes from the
+        rail; a settled collection credits the business's ZMW wallet
+        in full and fires mobile_money.collection.completed.
+        Requires the mobile_money:read scope."""
+        from urllib.parse import quote
+        return self.c._request("GET", f"mobile-money/collections/{quote(reference, safe='')}")
 
 
 class _Settings:

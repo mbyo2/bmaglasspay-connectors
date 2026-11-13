@@ -51,7 +51,7 @@ class BMaGlass_Blocks_Integration extends AbstractPaymentMethodType
     {
         $enabled = isset($this->bmaglass_settings['enabled']) ? $this->bmaglass_settings['enabled'] : 'no';
         $key = isset($this->bmaglass_settings['api_key']) ? trim((string) $this->bmaglass_settings['api_key']) : '';
-        return $enabled === 'yes' && strpos($key, 'bmp_') === 0;
+        return $enabled === 'yes' && (strpos($key, 'bmg_') === 0 || strpos($key, 'bmp_') === 0);
     }
 
     public function get_payment_method_script_handles()

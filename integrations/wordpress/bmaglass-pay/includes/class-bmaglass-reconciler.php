@@ -143,6 +143,112 @@ class BMaGlass_Reconciler
         return true;
     }
 
+    /** Find the unsettled order carrying a mobile-money merchant reference, or null. */
+    public static function find_order_by_momo_merchant_reference($merchantReference)
+    {
+        $orders = wc_get_orders(array(
+            'limit' => 1,
+            'status' => array('on-hold', 'pending'),
+            'meta_query' => array(
+                array('key' => '_bmaglass_momo_merchant_reference', 'value' => (string) $merchantReference),
+            ),
+        ));
+        return $orders ? $orders[0] : null;
+    }
+
+    /**
+     * Check one mobile-money order against the API; completes it
+     * when the collection has settled, and fails it (with the
+     * reason) when the collection failed. Shares the _bmaglass_settled
+     * exactly-once guard with the payment-link paths, so the webhook
+     * and this poll can never double-complete an order.
+     */
+    public static function reconcile_momo_order($order, BMaGlassClient $client)
+    {
+        if (!$order || $order->get_meta('_bmaglass_settled') === 'yes') {
+            return $order && $order->get_meta('_bmaglass_settled') === 'yes';
+        }
+        if (!in_array($order->get_status(), array('on-hold', 'pending'), true)) {
+            return false;
+        }
+        $reference = (string) $order->get_meta('_bmaglass_momo_reference');
+        if ($reference === '') {
+            return false;
+        }
+        try {
+            $collection = $client->getMobileMoneyCollection($reference);
+        } catch (BMaGlassApiException $e) {
+            $order->add_order_note('BMaGlass mobile money: settlement check failed — ' . $e->userMessage());
+            return false;
+        }
+        if (!is_array($collection) || !isset($collection['status'])) {
+            return false;
+        }
+        if ($collection['status'] === 'successful') {
+            $order->update_meta_data('_bmaglass_settled', 'yes');
+            $order->save();
+            $order->payment_complete($reference);
+            $order->add_order_note(sprintf(
+                'Mobile money payment confirmed by reconciliation — %s ZMW from %s (%s), reference %s.',
+                number_format(isset($collection['amount']) ? (float) $collection['amount'] : (float) $order->get_total(), 2),
+                isset($collection['phone']) ? $collection['phone'] : '',
+                isset($collection['operator']) ? strtoupper((string) $collection['operator']) : '',
+                $reference
+            ));
+            $order->save();
+            return true;
+        }
+        if ($collection['status'] === 'failed') {
+            $reason = isset($collection['failure_reason']) && $collection['failure_reason'] !== ''
+                ? (string) $collection['failure_reason'] : 'the payment didn\'t go through';
+            $order->update_status('failed', sprintf(
+                'Mobile money payment failed — %s (reference %s). The buyer can try again from their account.',
+                $reason,
+                $reference
+            ));
+            $order->save();
+            return false;
+        }
+        return false;
+    }
+
+    /**
+     * Complete an order directly from a verified
+     * mobile_money.collection.completed event. The webhook route
+     * HMAC-verified the payload before this runs; we still
+     * cross-check the amount and currency against the order before
+     * completing, and the settled flag is persisted BEFORE
+     * payment_complete so a racing reconciler pass (or a duplicate
+     * delivery) stands down.
+     */
+    public static function complete_momo_order_from_event($merchantReference, $amount, $currency)
+    {
+        $order = self::find_order_by_momo_merchant_reference($merchantReference);
+        if (!$order) {
+            return false;
+        }
+        if ($order->get_meta('_bmaglass_settled') === 'yes') {
+            return true;
+        }
+        if (strtoupper((string) $currency) !== 'ZMW') {
+            return false;
+        }
+        if ((float) $amount + 0.009 < round((float) $order->get_total(), 2)) {
+            return false;
+        }
+        $reference = (string) $order->get_meta('_bmaglass_momo_reference');
+        $order->update_meta_data('_bmaglass_settled', 'yes');
+        $order->save();
+        $order->payment_complete($reference);
+        $order->add_order_note(sprintf(
+            'Mobile money payment confirmed by webhook (mobile_money.collection.completed) — %s ZMW, reference %s.',
+            number_format((float) $amount, 2),
+            $reference
+        ));
+        $order->save();
+        return true;
+    }
+
     /** Cron entry point: sweep recent unsettled BMaGlass orders. */
     public static function reconcile_pending()
     {
@@ -165,6 +271,18 @@ class BMaGlass_Reconciler
         ));
         foreach ($orders as $order) {
             self::reconcile_order($order, $client);
+        }
+        $momoOrders = wc_get_orders(array(
+            'status' => array('on-hold', 'pending'),
+            'limit' => 50,
+            'date_created' => '>' . (time() - 7 * DAY_IN_SECONDS),
+            'meta_query' => array(
+                array('key' => '_bmaglass_momo_reference', 'compare' => 'EXISTS'),
+                array('key' => '_bmaglass_settled', 'compare' => 'NOT EXISTS'),
+            ),
+        ));
+        foreach ($momoOrders as $order) {
+            self::reconcile_momo_order($order, $client);
         }
     }
 }

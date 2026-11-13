@@ -39,6 +39,7 @@ export interface ConnectorConfig {
 }
 export interface Invoice { id: string; amount: number; currency: string; description: string | null; customer_email: string | null; status: "open" | "paid" | "expired" | "cancelled"; environment: "sandbox" | "production"; livemode: boolean; metadata: Record<string, unknown>; paid_at: string | null; created_at: string }
 export interface PaymentLinkAttempt { id: string; fiat_amount: number | null; fiat_currency: string; fee_payer: string; fee_percent: number | null; fee_sats: number | null; amount_sats: number | null; required_sats: number | null; seen_sats: number | null; received_sats: number | null; status: string; onchain_address: string | null; lightning_invoice: string | null; expires_at: string | null; settled_at: string | null; created_at: string }
+export interface MobileMoneyCollection { reference: string; merchant_reference: string | null; collection_id: string; transaction_id: string | null; amount: number; currency: string; operator: "mtn" | "airtel" | "zamtel"; phone: string; status: "pending" | "successful" | "failed"; failure_reason: string | null; environment: "sandbox" | "production"; livemode: boolean; wallet_balance: number | null; settled_at: string | null; created_at: string }
 
 export interface BMaGlassOptions {
   apiKey: string;
@@ -122,6 +123,35 @@ export class BMaGlass {
     attempts: (id: string) => this.request<PaymentLinkAttempt[]>("GET", `payment-links/${id}/attempts`),
     /** Sandbox only: mark one simulated payment on a sandbox link (fires payment_link.paid, flagged simulated). */
     simulatePayment: (id: string) => this.request<PaymentLink & { simulated?: boolean }>("POST", `payment-links/${id}/simulate-payment`),
+  };
+  mobileMoney = {
+    /**
+     * Start a mobile money collection on the business's connected
+     * mobile money account (Zambia, ZMW): the customer approves the
+     * prompt on their phone (MTN, Airtel or Zamtel). The key's
+     * environment selects which connection is used — a sandbox key
+     * runs against the sandbox connection (gateway test numbers; no
+     * real phone is ever charged), a production key against the
+     * production connection. `reference` is your own reference for
+     * the collection and doubles as the idempotency key: repeating a
+     * create with the same reference returns the original collection
+     * instead of charging the customer twice. Requires the
+     * mobile_money:create scope. Gate errors: 400
+     * business_not_set_up / not_configured, 403 not_entitled (the
+     * business is not registered in Zambia, or mobile money is
+     * switched off) / business_inactive.
+     */
+    createCollection: (input: { amount: number; phone: string; operator?: "mtn" | "airtel" | "zamtel"; reference?: string; idempotency_key?: string }) =>
+      this.request<MobileMoneyCollection>("POST", "mobile-money/collections", input),
+    /**
+     * A collection's current state, by platform reference (BMG-…) or
+     * your own reference. Polling refreshes from the rail: when the
+     * collection settles, the business's ZMW wallet is credited in
+     * full and mobile_money.collection.completed fires to the
+     * environment's webhook endpoints. Requires mobile_money:read.
+     */
+    getCollection: (reference: string) =>
+      this.request<MobileMoneyCollection>("GET", `mobile-money/collections/${encodeURIComponent(reference)}`),
   };
   settings = {
     /** The merchant's fee-bearer default + the platform's current fee rates. Read-only; any valid key. */

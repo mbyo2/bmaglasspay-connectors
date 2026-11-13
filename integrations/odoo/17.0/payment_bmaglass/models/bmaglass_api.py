@@ -283,6 +283,32 @@ class BMaGlassClient:
     def payment_link_attempts(self, link_id):
         return self._request("GET", "payment-links/%s/attempts" % link_id)
 
+    def create_mobile_money_collection(self, amount, phone, operator=None, reference=None):
+        """POST /mobile-money/collections — start a mobile money
+        collection on the business's own connected mobile money
+        account (Zambia, ZMW): the customer approves the prompt on
+        their phone (MTN, Airtel or Zamtel). The key's environment
+        selects which connection is used — a sandbox key runs against
+        the sandbox connection (gateway test numbers; no real phone
+        is ever charged). `reference` is your own reference for the
+        collection and doubles as the idempotency key: repeating a
+        create with the same reference returns the original
+        collection instead of charging the customer twice."""
+        body = {"amount": round(float(amount), 2), "phone": str(phone)}
+        if operator is not None:
+            body["operator"] = operator
+        if reference is not None:
+            body["reference"] = reference
+        return self._request("POST", "mobile-money/collections", body)
+
+    def get_mobile_money_collection(self, reference):
+        """GET /mobile-money/collections/{reference} — a collection's
+        current state, by platform reference (BMG-...) or your own
+        reference. Polling refreshes from the rail; a settled
+        collection credits the business's ZMW wallet in full and
+        fires mobile_money.collection.completed."""
+        return self._request("GET", "mobile-money/collections/%s" % reference)
+
     def settings(self):
         return self._request("GET", "settings")
 
