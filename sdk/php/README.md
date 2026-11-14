@@ -59,7 +59,9 @@ $event = Client::parseWebhookEvent(file_get_contents('php://input'),
 - Webhook events that really occur today: `transaction.completed`
   (your own API transfers), `payment_link.created`,
   `payment_link.paid` (a payment link was paid — exactly once per
-  settlement), `webhook.test`.
+  settlement), `invoice.created`, `invoice.paid`,
+  `mobile_money.collection.completed` (a mobile-money collection
+  settled — exactly once per settlement), `webhook.test`.
 
 ## Test
 

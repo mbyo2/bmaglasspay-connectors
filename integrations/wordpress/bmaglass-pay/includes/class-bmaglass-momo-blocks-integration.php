@@ -64,12 +64,26 @@ class BMaGlass_Momo_Blocks_Integration extends AbstractPaymentMethodType
 
     public function get_payment_method_data()
     {
-        return array(
+        $data = array(
             'title' => isset($this->momo_settings['title']) && $this->momo_settings['title'] !== ''
                 ? $this->momo_settings['title'] : 'Mobile money',
             'description' => isset($this->momo_settings['description'])
                 ? $this->momo_settings['description'] : '',
             'supports' => array('products'),
         );
+        // Buyer-pays disclosure for block checkout: the gateway reads
+        // the merchant's fee-bearer <redacted> from the connector config
+        // (cached 5 minutes). Absent when the gateway class or the
+        // shared API key is unavailable — the block then shows no
+        // notice, exactly as before.
+        if (class_exists('WC_Gateway_BMaGlass_Mobile_Money') && function_exists('bmaglass_client_from_settings')) {
+            try {
+                $gateway = new WC_Gateway_BMaGlass_Mobile_Money();
+                $data['fee_bearer'] = $gateway->momo_fee_bearer();
+            } catch (Exception $e) {
+                // Leave fee_bearer absent.
+            }
+        }
+        return $data;
     }
 }

@@ -1,0 +1,1 @@
+{"created":"2026-10-26T00:00:00.000Z","data":{"amount":250.0,"created_at":"2026-10-26T00:00:00.000Z","currency":"ZMW","customer_email":"buyer@example.com","description":"Order #1042","environment":"sandbox","id":"8f14e45f-ea0b-4b3f-9f2d-3f0d3f8b9c01","livemode":false,"metadata":{},"paid_at":null,"status":"open"},"id":"evt_example","type":"invoice.created"}

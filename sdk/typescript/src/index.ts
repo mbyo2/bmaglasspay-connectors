@@ -24,17 +24,19 @@ export class BMaGlassError extends Error {
 
 export interface Wallet { id: string; currency: string; balance: number; status: string; created_at: string; updated_at: string }
 export interface Transaction { uuid_id: string; amount: number; currency: string; direction: string; status: string; description: string | null; recipient_name: string | null; fee_amount: number | null; created_at: string }
-export interface PaymentLink { id: string; title: string; description: string | null; amount: number | null; currency: string; link_code: string; status: string; payment_count: number; total_collected: number; expires_at: string | null; created_at: string; /** Who funds the platform fee on this link ("seller" | "buyer") — the merchant default from GET /settings unless overridden at creation. */ fee_payer?: "seller" | "buyer"; /** Buyer return URL offered by the hosted pay page after payment, when set. */ redirect_url?: string | null; /** Platform fee on the link amount (2.5% link rate), in the link currency. */ fee_amount?: number | null; /** What the buyer pays in total (amount + fee when fee_payer is "buyer"). */ buyer_total?: number | null; /** What the seller receives after the fee (amount − fee when fee_payer is "seller"). */ seller_receives?: number | null }
+export interface PaymentLink { id: string; title: string; description: string | null; amount: number | null; currency: string; link_code: string; status: string; payment_count: number; total_collected: number; expires_at: string | null; created_at: string; /** Who funds the platform fee on this link ("seller" | "buyer") — the merchant default from GET /settings unless overridden at creation. */ fee_payer?: "seller" | "buyer"; /** Buyer return URL offered by the hosted pay page after payment, when set. */ redirect_url?: string | null; /** Platform fee on the link amount at the current platform rate. */ fee_amount?: number | null; /** What the buyer pays in total (amount + fee when fee_payer is "buyer"). */ buyer_total?: number | null; /** What the seller receives after the fee (amount − fee when fee_payer is "seller"). */ seller_receives?: number | null }
 export interface WebhookEndpoint { id: string; url: string; events: string[]; is_active: boolean; created_at: string; secret?: string }
 export interface WebhookDelivery { id: string; webhook_id: string | null; event_id: string; event_type: string; webhook_url: string; status: string; attempts: number; response_status: number | null; error_message: string | null; created_at: string }
 export interface BitcoinQuote { id: string; side: "buy" | "sell"; amount_zmw: number; amount_sats: number; fee_bps: number; fee_zmw: number; mid_rate_zmw: number; expires_at: string; created_at: string }
-export interface AccountSettings { fee_payer_default: "seller" | "buyer"; platform_fee_percent: number | null; paypal_platform_fee_percent: number | null; /** The merchant's mobile-money fee-bearer choice (who funds the 1% momo service charge). */ momo_fee_bearer: "seller" | "buyer"; note: string }
+export interface AccountSettings { fee_payer_default: "seller" | "buyer"; platform_fee_percent: number | null; paypal_platform_fee_percent: number | null; /** The merchant's mobile-money fee-bearer <redacted> (who funds the 1% momo service charge) — returned by GET /settings live (gate14-api-webhook-a1). */ momo_fee_bearer: "seller" | "buyer"; note: string }
 export interface FeatureState { status: "enabled" | "disabled" | "not_entitled" | "pending_verification"; reason_code: string | null; /** Whether the business has a gateway connection saved for this feature (mobile_money). */ connected?: boolean; /** The merchant's fee-bearer default for this feature (mobile_money), from GET /settings. */ fee_bearer?: "seller" | "buyer" }
+/** mobile_money carries two extra read-only fields beyond FeatureState: whether a connection exists for this key's environment, and who pays the 1% service charge on a collection ("seller" | "buyer") — the merchant's own choice, so a plugin can show the buyer the true total (product + service charge when the buyer pays) before it starts a collection. */
+export interface MobileMoneyFeatureState extends FeatureState { connected: boolean; fee_bearer: "seller" | "buyer" }
 export interface ConnectorConfig {
   environment: "sandbox" | "production"; livemode: boolean; config_version: string;
   key: { key_id: string; scopes: string[]; status: string };
   business: { display_name: string | null; country: string | null; currency: string | null; status: string };
-  features: { invoices: FeatureState; payment_links: FeatureState; bitcoin: FeatureState; transfers: FeatureState; mobile_money: FeatureState };
+  features: { invoices: FeatureState; payment_links: FeatureState; bitcoin: FeatureState; transfers: FeatureState; mobile_money: MobileMoneyFeatureState };
   settlement: { type: string; currency: string | null };
 }
 export interface Invoice { id: string; amount: number; currency: string; description: string | null; customer_email: string | null; status: "open" | "paid" | "expired" | "cancelled"; environment: "sandbox" | "production"; livemode: boolean; metadata: Record<string, unknown>; paid_at: string | null; created_at: string }
@@ -154,7 +156,7 @@ export class BMaGlass {
       this.request<MobileMoneyCollection>("GET", `mobile-money/collections/${encodeURIComponent(reference)}`),
   };
   settings = {
-    /** The merchant's fee-bearer default + the platform's current fee rates. Read-only; any valid key. */
+    /** The merchant's fee-bearer default (fee_payer_default) + the momo fee-bearer (momo_fee_bearer) + the platform's current fee rates. Read-only; any valid key. */
     get: () => this.request<AccountSettings>("GET", "settings"),
   };
   bitcoin = {

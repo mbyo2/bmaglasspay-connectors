@@ -72,6 +72,13 @@
 			settings.description
 				? createElement( 'p', null, settings.description )
 				: null,
+			// Buyer-pays disclosure: when the merchant chose buyer-pays,
+			// a 1% service charge is added on top of the order total —
+			// the exact amount shows on the phone prompt before the
+			// buyer approves it.
+			settings.fee_bearer === 'buyer'
+				? createElement( 'p', null, 'A 1% service charge is added on top of your order total — the exact amount shows on your phone prompt before you approve it.' )
+				: null,
 			createElement(
 				'p',
 				{ className: 'form-row form-row-wide' },

@@ -62,7 +62,7 @@ export interface Transaction { uuid_id: string; amount: number; currency: string
 export interface PaymentLink { id: string; title: string; description: string | null; amount: number | null; currency: string; link_code: string; status: string; payment_count: number; total_collected: number; expires_at: string | null; created_at: string; /** Who funds the platform fee on this link ("seller" | "buyer") — the merchant default from GET /settings unless overridden at creation. */ fee_payer?: "seller" | "buyer"; /** Buyer return URL offered by the hosted pay page after payment, when set. */ redirect_url?: string | null; /** Platform fee on the link amount (2.5% link rate), in the link currency. */ fee_amount?: number | null; /** What the buyer pays in total (amount + fee when fee_payer is "buyer"). */ buyer_total?: number | null; /** What the seller receives after the fee (amount − fee when fee_payer is "seller"). */ seller_receives?: number | null }
 export interface WebhookEndpoint { id: string; url: string; events: string[]; is_active: boolean; created_at: string; secret?: string }
 export interface WebhookDelivery { id: string; webhook_id: string; event_id: string; event_type: string; webhook_url: string; status: string; attempts: number; response_status: number | null; error_message: string | null; created_at: string }
-export interface MobileMoneyCollection { reference: string; merchant_reference: string | null; collection_id: string; transaction_id: string | null; amount: number; currency: string; operator: "mtn" | "airtel" | "zamtel"; phone: string; status: "pending" | "successful" | "failed"; failure_reason: string | null; environment: "sandbox" | "production"; livemode: boolean; wallet_balance: number | null; settled_at: string | null; created_at: string }
+export interface MobileMoneyCollection { reference: string; merchant_reference: string | null; collection_id: string; transaction_id: string | null; amount: number; /** The product amount the 1% service charge is computed on — equals `amount` in seller mode. */ base_amount: number; /** The 1% service charge on the product amount (0 in seller mode). */ service_charge: number; /** Who pays the service charge ("seller" | "buyer"). */ fee_bearer: "seller" | "buyer"; currency: string; operator: "mtn" | "airtel" | "zamtel"; phone: string; status: "pending" | "successful" | "failed"; failure_reason: string | null; environment: "sandbox" | "production"; livemode: boolean; wallet_balance: number | null; settled_at: string | null; created_at: string }
 
 export function paymentLinkUrl(linkCode: string): string {
   return `${SITE_BASE}/pay/${encodeURIComponent(linkCode)}`;
@@ -172,8 +172,8 @@ export class BMaGlass {
       this.request<MobileMoneyCollection>("GET", `mobile-money/collections/${encodeURIComponent(reference)}`),
   };
   settings = {
-    /** The merchant's fee-bearer default + the platform's current fee rates. Read-only; any valid key. */
-    get: () => this.request<{ fee_payer_default: string; platform_fee_percent: number | null; paypal_platform_fee_percent: number | null; note: string }>("GET", "settings"),
+    /** The merchant's fee-bearer default (fee_payer_default) + the momo fee-bearer (momo_fee_bearer) + the platform's current fee rates. Read-only; any valid key. */
+    get: () => this.request<{ fee_payer_default: string; platform_fee_percent: number | null; paypal_platform_fee_percent: number | null; /** The merchant's mobile-money fee-bearer <redacted> (who funds the 1% momo service charge) — returned by GET /settings live. */ momo_fee_bearer: "seller" | "buyer"; note: string }>("GET", "settings"),
   };
   bitcoin = {
     balance: () => this.request<Array<{ asset: string; balance_sats: number; available_sats: number; updated_at: string }>>("GET", "bitcoin/balance"),

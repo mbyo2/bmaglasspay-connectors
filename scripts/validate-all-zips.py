@@ -9,9 +9,9 @@ final deterministically rebuilt zips:
   `bmp_` / `sk_live_` values; `...` placeholders do not match).
 - store (11): scripts/validate-store-zips.py (structure + Odoo client
   tests 15/15 per variant + `php -l` + repo client-identity scripts).
-- WooCommerce: the three mocked-WP suites (86 checks) + `php -l` +
+- WooCommerce: the four mocked-WP suites (116 checks) + `php -l` +
   `node --check` + unzipped tree diffed against the repo plugin folder.
-- SDKs: TS contract test (39 assertions), Python unittest (8 tests),
+- SDKs: TS contract test (47 assertions), Python unittest (8 tests),
   PHP run-tests (26 checks), React Native run-tests (22 checks),
   Flutter `dart test` (10 tests; Dart 3.14.0 downloaded on demand if
   no `dart` is on PATH, else recorded as skipped, never fatal).
@@ -195,7 +195,8 @@ def main() -> None:
                     wp_dir / "tests")
     for suite, expect in (("run-client-tests.php", 49),
                           ("run-blocks-tests.php", 30),
-                          ("run-reconciler-tests.php", 18)):
+                          ("run-reconciler-tests.php", 18),
+                          ("run-momo-gateway-tests.php", 30)):
         rc, out = run(["php", f"tests/{suite}"], cwd=wp_dir)
         passed = out.count("PASS ")
         failed = out.count("FAIL ")
