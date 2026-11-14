@@ -21,12 +21,29 @@ and file list per zip.
 """
 import argparse
 import hashlib
+import os
 import shutil
+import time
 import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = "1.0.0"
+
+# Reproducible builds: every entry in every zip carries the same fixed
+# timestamp (SOURCE_DATE_EPOCH, default 2026-11-14T00:00:00Z) and fixed
+# permissions, so rebuilding from the same tree is byte-identical.
+# scripts/build-zips.sh sets SOURCE_DATE_EPOCH; running this script
+# directly uses the default.
+EPOCH = int(os.environ.get("SOURCE_DATE_EPOCH", "1794614400"))
+DATE_TIME = time.gmtime(EPOCH)[:6]
+
+
+def _entry(arc: str) -> zipfile.ZipInfo:
+    zi = zipfile.ZipInfo(arc, DATE_TIME)
+    zi.compress_type = zipfile.ZIP_DEFLATED
+    zi.external_attr = 0o644 << 16
+    return zi
 
 ODOO_INSTALL = """# BMaGlass Pay for Odoo {ver} — install
 
@@ -157,13 +174,13 @@ def add_tree(zf: zipfile.ZipFile, src: Path, arc_prefix: str = "") -> list[str]:
             continue
         if p.is_file():
             arc = (arc_prefix + "/" + p.relative_to(src).as_posix()).lstrip("/")
-            zf.write(p, arc)
+            zf.writestr(_entry(arc), p.read_bytes())
             added.append(arc)
     return added
 
 
 def add_text(zf: zipfile.ZipFile, arc: str, text: str) -> str:
-    zf.writestr(arc, text)
+    zf.writestr(_entry(arc), text.encode())
     return arc
 
 
