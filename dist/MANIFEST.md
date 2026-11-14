@@ -8,14 +8,17 @@ Every zip carries install instructions: `INSTALL/README.md` at its root (store m
 
 ## bmaglasspay-automation-1.0.0.zip
 
-- Size: 7087 bytes
-- SHA-256: `f00abf1be1b61fa6412d86d947fea9f8c0f148735beb688db134f81232fffe3a`
+- Size: 8455 bytes
+- SHA-256: `c65ba8276256acb7302dc0d2af97abc98bb12e8640cee7bb7b19c0adf9c587a1`
 - Download: https://hhxwwozpvgktuqutfkhc.supabase.co/storage/v1/object/public/downloads/bmaglasspay-automation-1.0.0.zip
 - Install: Unzip, read `README.md`, import the Zapier / Make recipe
-- Files (8):
+- Files (11):
   - `INSTALL/README.md`
   - `LICENSE`
   - `README.md`
+  - `examples/invoice-created.json`
+  - `examples/invoice-paid.json`
+  - `examples/mobile-money-collection-completed.json`
   - `examples/payment-link-created.json`
   - `examples/payment-link-paid.json`
   - `examples/transaction-completed.json`
@@ -36,8 +39,8 @@ Every zip carries install instructions: `INSTALL/README.md` at its root (store m
 
 ## bmaglasspay-magento-1.0.0.zip
 
-- Size: 17347 bytes
-- SHA-256: `59474dd3a445d23f9fe5692dd86a08e2afb3356dbc409171f3e066fe8d08a421`
+- Size: 17402 bytes
+- SHA-256: `8b267c0eb3243604fbf03e514a1cef60a41ae6c91d459c34d4cab2573a903e80`
 - Download: https://hhxwwozpvgktuqutfkhc.supabase.co/storage/v1/object/public/downloads/bmaglasspay-magento-1.0.0.zip
 - Install: Copy `BMaGlass/` into `app/code/` (Magento 2.4.6–2.4.9)
 - Files (16):
@@ -189,8 +192,8 @@ Every zip carries install instructions: `INSTALL/README.md` at its root (store m
 
 ## bmaglasspay-opencart-3-1.0.0.zip
 
-- Size: 15067 bytes
-- SHA-256: `04a3d2f46941fb5cf9fdb8c5b7d46f7195d29fdc026bc308440064655acfda63`
+- Size: 15122 bytes
+- SHA-256: `dd4004c0338522197234d8c8a5cddcf32f43eb3a4eb61ed1386f0fea78692194`
 - Download: https://hhxwwozpvgktuqutfkhc.supabase.co/storage/v1/object/public/downloads/bmaglasspay-opencart-3-1.0.0.zip
 - Install: OpenCart admin → Extensions → Installer
 - Files (11):
@@ -208,8 +211,8 @@ Every zip carries install instructions: `INSTALL/README.md` at its root (store m
 
 ## bmaglasspay-opencart-4-1.0.0.zip
 
-- Size: 14304 bytes
-- SHA-256: `f94cbdadc684157896266b60abbab507241fbab4e9ced5aa893cce71100d66ad`
+- Size: 14359 bytes
+- SHA-256: `725d16c6ead506ef609f74ffd084151f8302df0f2178cdc7572e390407c2ff94`
 - Download: https://hhxwwozpvgktuqutfkhc.supabase.co/storage/v1/object/public/downloads/bmaglasspay-opencart-4-1.0.0.zip
 - Install: OpenCart admin → Extensions → Installer
 - Files (10):
@@ -226,8 +229,8 @@ Every zip carries install instructions: `INSTALL/README.md` at its root (store m
 
 ## bmaglasspay-prestashop-1.7-1.0.0.zip
 
-- Size: 13161 bytes
-- SHA-256: `f9c7c63400025c1db1cba2f9ae0b0b1379826e39f78683606b73ba4afd0dc264`
+- Size: 13216 bytes
+- SHA-256: `f174f828d05f8810ae62e596bbe1ace89290462d6aea877e4c9b38cf083d1c87`
 - Download: https://hhxwwozpvgktuqutfkhc.supabase.co/storage/v1/object/public/downloads/bmaglasspay-prestashop-1.7-1.0.0.zip
 - Install: PrestaShop back office → Module Manager → Upload a module
 - Files (8):
@@ -242,8 +245,8 @@ Every zip carries install instructions: `INSTALL/README.md` at its root (store m
 
 ## bmaglasspay-prestashop-8-1.0.0.zip
 
-- Size: 13131 bytes
-- SHA-256: `bc08fd47acdaee6d68c4c87404b35b066bd299946c7e46061cc1f63c988a7205`
+- Size: 13186 bytes
+- SHA-256: `353bbb328f71df32c756cf1b672fb7faf0725190d5d26f4e4c6af2e5f14aa6f7`
 - Download: https://hhxwwozpvgktuqutfkhc.supabase.co/storage/v1/object/public/downloads/bmaglasspay-prestashop-8-1.0.0.zip
 - Install: PrestaShop back office → Module Manager → Upload a module
 - Files (8):
@@ -258,8 +261,8 @@ Every zip carries install instructions: `INSTALL/README.md` at its root (store m
 
 ## bmaglasspay-prestashop-9-1.0.0.zip
 
-- Size: 13486 bytes
-- SHA-256: `bffffc681b26fe340cf5fbd1d12a446fabc3416cce1552373a0eef9da5a79e0d`
+- Size: 13541 bytes
+- SHA-256: `83b032756ef0d6cf83b20691270c54770807443419955a4c8f9aa1fb25ec4e32`
 - Download: https://hhxwwozpvgktuqutfkhc.supabase.co/storage/v1/object/public/downloads/bmaglasspay-prestashop-9-1.0.0.zip
 - Install: PrestaShop back office → Module Manager → Upload a module
 - Files (9):
@@ -275,8 +278,8 @@ Every zip carries install instructions: `INSTALL/README.md` at its root (store m
 
 ## bmaglasspay-sdk-flutter-1.0.0.zip
 
-- Size: 11151 bytes
-- SHA-256: `684aceafd6022edd24d4cc4f0aaedcecfefde61641e2c2634bb0de25d16937db`
+- Size: 11208 bytes
+- SHA-256: `6c35b4d0d77dc2fe5d020ac0468ecdbb422081753d335d7f3807ad586fec7402`
 - Download: https://hhxwwozpvgktuqutfkhc.supabase.co/storage/v1/object/public/downloads/bmaglasspay-sdk-flutter-1.0.0.zip
 - Install: Drop into your Flutter / Dart project (`bmaglass_sdk`)
 - Files (9):
@@ -292,8 +295,8 @@ Every zip carries install instructions: `INSTALL/README.md` at its root (store m
 
 ## bmaglasspay-sdk-php-1.0.0.zip
 
-- Size: 11133 bytes
-- SHA-256: `af709c37c4e174ba593d4f006d569b8e80670c9643483608b0ab9af0d540c714`
+- Size: 11228 bytes
+- SHA-256: `dc2e240751536fa14a020b88536a1396a77821248341b3592ab52b6d806ffdd6`
 - Download: https://hhxwwozpvgktuqutfkhc.supabase.co/storage/v1/object/public/downloads/bmaglasspay-sdk-php-1.0.0.zip
 - Install: Drop `src/` into your project, or require via Composer (`bmaglass/bmaglass-sdk`)
 - Files (6):
@@ -318,8 +321,8 @@ Every zip carries install instructions: `INSTALL/README.md` at its root (store m
 
 ## bmaglasspay-sdk-react-native-1.0.0.zip
 
-- Size: 11389 bytes
-- SHA-256: `db10e40dde97f894f7a2f1704d4325f738cc1d97bb4b8f7bb8de0a582517f585`
+- Size: 11564 bytes
+- SHA-256: `9cf9e4ac790fd9b1579d3475bcfdf1ba5b0d4a2b1a7b42d0f00d609efefa1da3`
 - Download: https://hhxwwozpvgktuqutfkhc.supabase.co/storage/v1/object/public/downloads/bmaglasspay-sdk-react-native-1.0.0.zip
 - Install: Drop into your React Native / Expo project (`@bmaglass/sdk-react-native`)
 - Files (7):
@@ -333,8 +336,8 @@ Every zip carries install instructions: `INSTALL/README.md` at its root (store m
 
 ## bmaglasspay-sdk-typescript-1.0.0.zip
 
-- Size: 12954 bytes
-- SHA-256: `da584225fc896f1d48786da32918f415d5eaa3ea7b1d0014cd86a52b38df3363`
+- Size: 14175 bytes
+- SHA-256: `c29c441a4d4ce2cdb58f5d5cd534d90805721e24ad7d450dc1121debf8db304e`
 - Download: https://hhxwwozpvgktuqutfkhc.supabase.co/storage/v1/object/public/downloads/bmaglasspay-sdk-typescript-1.0.0.zip
 - Install: Drop in / `npm install` from the package in the zip (`@bmaglass/sdk`)
 - Files (8):
@@ -349,8 +352,8 @@ Every zip carries install instructions: `INSTALL/README.md` at its root (store m
 
 ## bmaglasspay-woocommerce-1.0.0.zip
 
-- Size: 30014 bytes
-- SHA-256: `f9ddf0783258b5e76e1ed79b2cc35cfbe18b89bfa21e759c76c247786d7fc6b2`
+- Size: 31402 bytes
+- SHA-256: `03756f5051556a5eff3f0882e5ab0e00d00b7a7dc23328cef5746fa0e32a7af0`
 - Download: https://hhxwwozpvgktuqutfkhc.supabase.co/storage/v1/object/public/downloads/bmaglasspay-woocommerce-1.0.0.zip
 - Install: WordPress Admin → Plugins → Add New → Upload
 - Files (12):

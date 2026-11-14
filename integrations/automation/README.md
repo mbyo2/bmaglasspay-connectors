@@ -14,6 +14,9 @@ BMaGlass webhooks fire for:
 | `transaction.completed` | a transfer made **via the developer API** completes | `{transaction_id, amount, currency, to_user_id}` |
 | `payment_link.created` | a payment link is created (app or API) | the link row (`id`, `link_code`, `title`, `amount`, `currency`, `status`, `fee_payer`, `fee_amount`, `buyer_total`, `seller_receives`, `redirect_url`, `created_at`) |
 | `payment_link.paid` | a buyer **pays** a payment link (exactly once per settlement) | `{payment_link_id, link_code, title, amount, currency, fee_payer, fee_amount, total_charged, transaction_id, payer_transaction_id, payment_method, payment_count, total_collected, reference, metadata, settled_at}` |
+| `invoice.created` | an invoice is created via the developer API | the invoice row (`id`, `amount`, `currency`, `description`, `customer_email`, `status`, `environment`, `livemode`, `metadata`, `paid_at`, `created_at`) |
+| `invoice.paid` | a sandbox invoice is driven to paid through the simulate-payment endpoint (flagged `simulated: true`) | the invoice row with `status: "paid"` and `paid_at` set |
+| `mobile_money.collection.completed` | a mobile-money collection settles (exactly once per settlement) | `{reference, merchant_reference, collection_id, transaction_id, amount, base_amount, service_charge, fee_bearer, currency, operator, status, environment, settled_at}` |
 | `webhook.test` | you press "send test" | `{ping: true}` |
 
 Example payloads: `examples/*.json` in this folder.

@@ -246,9 +246,12 @@ class BMaGlass {
 
   /// GET /settings — the merchant's fee-bearer default
   /// (fee_payer_default) and the platform's current fee rates
-  /// (platform_fee_percent, paypal_platform_fee_percent). Read-only;
-  /// available to any valid key. The default itself is set in the
-  /// BMaGlass Pay dashboard — clients inherit it, they do not set it.
+  /// (platform_fee_percent, paypal_platform_fee_percent). Also
+  /// returns the merchant's mobile-money fee-bearer
+  /// (momo_fee_bearer: who funds the 1% momo service charge).
+  /// Read-only; available to any valid key. The defaults
+  /// themselves are set in the BMaGlass Pay dashboard — clients
+  /// inherit them, they do not set them.
   Future<Map<String, dynamic>> settings() async {
     final data = await _request('GET', 'settings') as Map<String, dynamic>;
     return data;

@@ -15,7 +15,7 @@ const server = createServer((req, res) => {
     seen.push({ method: req.method, url: req.url, key: req.headers["x-api-key"], idem: req.headers["idempotency-key"], body });
     const reply = (status, obj) => { res.writeHead(status, { "Content-Type": "application/json" }); res.end(JSON.stringify(obj)); };
     if (!["bmp_test_contract", "bmg_sandbox_contract"].includes(req.headers["x-api-key"])) return reply(401, { error: "invalid_api_key", message: "nope" });
-    if (req.url === "/connector/config") return reply(200, { data: { environment: "sandbox", livemode: false, config_version: "abc123", key: { key_id: "k1", scopes: ["config:read"], status: "active" }, business: { display_name: "QA Store", country: "ZM", currency: "ZMW", status: "pending" }, features: { invoices: { status: "enabled", reason_code: null }, payment_links: { status: "enabled", reason_code: null }, bitcoin: { status: "enabled", reason_code: null }, transfers: { status: "disabled", reason_code: "sandbox_simulation_only" }, mobile_money: { status: "disabled", reason_code: null } }, settlement: { type: "wallet", currency: "ZMW" } }, mode: "test" });
+    if (req.url === "/connector/config") return reply(200, { data: { environment: "sandbox", livemode: false, config_version: "abc123", key: { key_id: "k1", scopes: ["config:read"], status: "active" }, business: { display_name: "QA Store", country: "ZM", currency: "ZMW", status: "pending" }, features: { invoices: { status: "enabled", reason_code: null }, payment_links: { status: "enabled", reason_code: null }, bitcoin: { status: "enabled", reason_code: null }, transfers: { status: "disabled", reason_code: "sandbox_simulation_only" }, mobile_money: { status: "disabled", reason_code: null, connected: false, fee_bearer: "seller" } }, settlement: { type: "wallet", currency: "ZMW" } }, mode: "test" });
     if (req.url === "/invoices" && req.method === "POST") return reply(201, { data: { id: "inv1", amount: 250, currency: "ZMW", description: null, customer_email: null, status: "open", environment: "sandbox", livemode: false, metadata: {}, paid_at: null, created_at: "t" }, mode: "test" });
     if (req.url === "/invoices/inv1/simulate-payment") return reply(200, { data: { id: "inv1", amount: 250, currency: "ZMW", description: null, customer_email: null, status: "paid", environment: "sandbox", livemode: false, metadata: {}, paid_at: "t", created_at: "t" }, mode: "test", simulated: true });
     if (req.url === "/wallets") return reply(200, { data: [{ id: "w1", currency: "ZMW", balance: 42, status: "active", created_at: "x", updated_at: "y" }], mode: "test" });
@@ -24,10 +24,10 @@ const server = createServer((req, res) => {
     if (req.url === "/payment-links" && req.method === "GET") return reply(200, { data: [], mode: "test" });
     if (req.url === "/bitcoin/balance") return reply(200, { data: [{ asset: "BTC", balance_sats: 1000, available_sats: 1000, updated_at: "z" }], mode: "test" });
     if (req.url === "/webhooks" && req.method === "POST") return reply(201, { data: { id: "wh1", url: "https://example.com/hook", events: ["webhook.test"], is_active: true, created_at: "t", secret: "whsec_testsecret" }, mode: "test" });
-    if (req.url === "/settings") return reply(200, { data: { fee_payer_default: "seller", platform_fee_percent: 2.5, paypal_platform_fee_percent: 1, note: "n" }, mode: "test" });
+    if (req.url === "/settings") return reply(200, { data: { fee_payer_default: "seller", platform_fee_percent: 2.5, paypal_platform_fee_percent: 1, momo_fee_bearer: "seller", note: "n" }, mode: "test" });
     if (req.url === "/payment-links/link1/attempts") return reply(200, { data: [{ id: "att1", status: "waiting" }], mode: "test" });
-    if (req.url === "/mobile-money/collections" && req.method === "POST") { const b = JSON.parse(body || "{}"); return reply(201, { data: { reference: "BMG-C1", merchant_reference: b.reference ?? null, collection_id: "col1", transaction_id: null, amount: b.amount, currency: "ZMW", operator: b.operator ?? "mtn", phone: b.phone, status: "pending", failure_reason: null, environment: "sandbox", livemode: false, wallet_balance: null, settled_at: null, created_at: "t" }, mode: "test" }); }
-    if (req.url === "/mobile-money/collections/BMG-C1" && req.method === "GET") return reply(200, { data: { reference: "BMG-C1", merchant_reference: "order-42", collection_id: "col1", transaction_id: "tx1", amount: 100, currency: "ZMW", operator: "mtn", phone: "0961111111", status: "successful", failure_reason: null, environment: "sandbox", livemode: false, wallet_balance: 99, settled_at: "t", created_at: "t" }, mode: "test" });
+    if (req.url === "/mobile-money/collections" && req.method === "POST") { const b = JSON.parse(body || "{}"); return reply(201, { data: { reference: "BMG-C1", merchant_reference: b.reference ?? null, collection_id: "col1", transaction_id: null, amount: b.amount, base_amount: b.amount, service_charge: 0, fee_bearer: "seller", currency: "ZMW", operator: b.operator ?? "mtn", phone: b.phone, status: "pending", failure_reason: null, environment: "sandbox", livemode: false, wallet_balance: null, settled_at: null, created_at: "t" }, mode: "test" }); }
+    if (req.url === "/mobile-money/collections/BMG-C1" && req.method === "GET") return reply(200, { data: { reference: "BMG-C1", merchant_reference: "order-42", collection_id: "col1", transaction_id: "tx1", amount: 100, base_amount: 100, service_charge: 0, fee_bearer: "seller", currency: "ZMW", operator: "mtn", phone: "0961111111", status: "successful", failure_reason: null, environment: "sandbox", livemode: false, wallet_balance: 99, settled_at: "t", created_at: "t" }, mode: "test" });
     return reply(404, { error: "not_found", message: "no route" });
   });
 });
@@ -70,17 +70,29 @@ const settings = await client.settings.get();
 assert.equal(settings.fee_payer_default, "seller");
 assert.equal(settings.platform_fee_percent, 2.5);
 assert.equal(settings.paypal_platform_fee_percent, 1);
+// Live GET /settings also returns the momo fee-bearer (gate14-api-webhook-a1).
+assert.equal(settings.momo_fee_bearer, "seller");
 assert.equal((await client.paymentLinks.attempts("link1"))[0].status, "waiting");
 
 const coll = await client.mobileMoney.createCollection({ amount: 100, phone: "0961111111", reference: "order-42" });
 assert.equal(coll.status, "pending");
 assert.equal(coll.reference, "BMG-C1");
 assert.equal(coll.merchant_reference, "order-42");
+// Live collection shape: amount is the total charged; base_amount is the
+// product amount, service_charge the 1% on it, fee_bearer who funds it.
+assert.equal(coll.base_amount, 100);
+assert.equal(coll.service_charge, 0);
+assert.equal(coll.fee_bearer, "seller");
+assert.equal(cfg.features.mobile_money.connected, false);
+assert.equal(cfg.features.mobile_money.fee_bearer, "seller");
 assert.equal(seen.at(-1).url, "/mobile-money/collections");
 assert.deepEqual(JSON.parse(seen.at(-1).body), { amount: 100, phone: "0961111111", reference: "order-42" });
 const collStatus = await client.mobileMoney.getCollection("BMG-C1");
 assert.equal(collStatus.status, "successful");
 assert.equal(collStatus.wallet_balance, 99);
+assert.equal(collStatus.base_amount, 100);
+assert.equal(collStatus.service_charge, 0);
+assert.equal(collStatus.fee_bearer, "seller");
 const collByMerchantRef = await client.mobileMoney.getCollection("order-42").catch((e) => e);
 assert.ok(collByMerchantRef instanceof BMaGlassError && collByMerchantRef.status === 404); // stub only knows the platform reference
 

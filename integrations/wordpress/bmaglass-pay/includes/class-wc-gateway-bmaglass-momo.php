@@ -26,6 +26,17 @@
  *     order action) polls the collection status as the fallback —
  *     both paths complete exactly once.
  *
+ * Fee-bearer (gate14): the merchant's momo_fee_bearer choice is
+ * read from the same connector config (features.mobile_money.
+ * fee_bearer). The API always treats the posted amount as the
+ * PRODUCT amount and grosses it up by the 1% service charge when
+ * the buyer pays — so in buyer mode the buyer is charged the
+ * order total + 1%, and the merchant nets the full order total.
+ * The gateway shows the buyer that true total at checkout
+ * (payment_fields) and records the actually-charged amount from
+ * the collection response on the order — never the order total
+ * when the two differ.
+ *
  * The API key is shared with the main BMaGlass Pay gateway (its
  * settings hold the key and the webhook secret); this gateway adds
  * only its own title/description/enabled settings.
@@ -93,35 +104,76 @@ class WC_Gateway_BMaGlass_Mobile_Money extends WC_Payment_Gateway
     }
 
     /**
-     * Whether the merchant's BMaGlass account reports mobile money
-     * available for this key's environment (enabled + connected).
-     * Cached for 5 minutes — availability is a fact about the
-     * merchant's account, read from the connector config, never a
-     * plugin setting.
+     * The merchant's mobile_money feature block from the connector
+     * config (status / reason_code / connected / fee_bearer).
+     * Cached for 5 minutes — a fact about the merchant's account,
+     * read from the API, never a plugin setting.
      */
-    public function feature_available()
+    public function momo_feature()
     {
         $client = $this->client();
         if ($client === null) {
-            return false;
+            return array();
         }
         $settings = bmaglass_settings();
         $key = isset($settings['api_key']) ? (string) $settings['api_key'] : '';
-        $cacheKey = 'bmaglass_momo_avail_' . substr(md5($key), 0, 12);
+        $cacheKey = 'bmaglass_momo_feature_' . substr(md5($key), 0, 12);
         $cached = get_transient($cacheKey);
-        if ($cached !== false) {
-            return $cached === 'yes';
+        if (is_array($cached)) {
+            return $cached;
         }
         try {
             $config = $client->connectorConfig();
             $mm = isset($config['features']['mobile_money']) && is_array($config['features']['mobile_money'])
                 ? $config['features']['mobile_money'] : array();
-            $ok = (isset($mm['status']) && $mm['status'] === 'enabled') && !empty($mm['connected']);
         } catch (BMaGlassApiException $e) {
-            $ok = false;
+            $mm = array();
         }
-        set_transient($cacheKey, $ok ? 'yes' : 'no', 5 * MINUTE_IN_SECONDS);
-        return $ok;
+        set_transient($cacheKey, $mm, 5 * MINUTE_IN_SECONDS);
+        return $mm;
+    }
+
+    /**
+     * Whether the merchant's BMaGlass account reports mobile money
+     * available for this key's environment (enabled + connected).
+     */
+    public function feature_available()
+    {
+        $mm = $this->momo_feature();
+        return (isset($mm['status']) && $mm['status'] === 'enabled') && !empty($mm['connected']);
+    }
+
+    /**
+     * Who pays the 1% mobile-money service charge on a collection —
+     * the merchant's own choice from the connector config
+     * (features.mobile_money.fee_bearer). 'seller' unless the
+     * merchant chose 'buyer'.
+     */
+    public function momo_fee_bearer()
+    {
+        $mm = $this->momo_feature();
+        return (isset($mm['fee_bearer']) && $mm['fee_bearer'] === 'buyer') ? 'buyer' : 'seller';
+    }
+
+    /**
+     * The 1% service charge on a product amount, exactly as the
+     * server computes it (round to cents). In buyer mode the buyer
+     * is charged product + charge; in seller mode the charge is 0
+     * for the buyer.
+     */
+    public static function momo_service_charge($product_amount)
+    {
+        return round((float) $product_amount * 0.01, 2);
+    }
+
+    /** The total the buyer is charged for a product amount. */
+    public function momo_buyer_total($product_amount)
+    {
+        $product_amount = round((float) $product_amount, 2);
+        if ($this->momo_fee_bearer() !== 'buyer') {
+            return $product_amount;
+        }
+        return round($product_amount + self::momo_service_charge($product_amount), 2);
     }
 
     public function is_available()
@@ -141,6 +193,32 @@ class WC_Gateway_BMaGlass_Mobile_Money extends WC_Payment_Gateway
     {
         if ($this->description) {
             echo wpautop(wptexturize($this->description));
+        }
+        // Buyer-pays disclosure: when the merchant chose buyer-pays,
+        // the buyer is charged the order total + the 1% service
+        // charge — show the true total before they place the order,
+        // never let the phone prompt be the first they hear of it.
+        if ($this->momo_fee_bearer() === 'buyer') {
+            $cart_total = null;
+            if (function_exists('WC') && WC() && isset(WC()->cart) && is_object(WC()->cart)
+                && method_exists(WC()->cart, 'get_total')) {
+                $cart_total = round((float) WC()->cart->get_total('edit'), 2);
+            }
+            if ($cart_total !== null && $cart_total > 0) {
+                $charge = self::momo_service_charge($cart_total);
+                $total = round($cart_total + $charge, 2);
+                echo '<p>' . sprintf(
+                    'You will be charged %s %s — your %s %s order plus a %s %s service charge.',
+                    number_format($total, 2),
+                    esc_html(get_woocommerce_currency()),
+                    number_format($cart_total, 2),
+                    esc_html(get_woocommerce_currency()),
+                    number_format($charge, 2),
+                    esc_html(get_woocommerce_currency())
+                ) . '</p>';
+            } else {
+                echo '<p>' . esc_html__('A 1% service charge is added on top of your order total — the exact amount shows on your phone prompt before you approve it.', 'bmaglass-pay') . '</p>';
+            }
         }
         ?>
         <fieldset id="wc-<?php echo esc_attr($this->id); ?>-form" class="wc-payment-form" style="background:transparent;">
@@ -244,6 +322,11 @@ class WC_Gateway_BMaGlass_Mobile_Money extends WC_Payment_Gateway
         $order->update_meta_data('_bmaglass_momo_reference', $reference);
         $order->update_meta_data('_bmaglass_momo_merchant_reference', self::merchant_reference($order_id));
         $order->update_meta_data('_bmaglass_momo_phone', $phone);
+        // The amount actually charged — in buyer mode the API grosses
+        // the order total up by the 1% service charge, so the order
+        // note must quote the collection's amount, never the order
+        // total, when the two differ.
+        $charged = isset($collection['amount']) ? round((float) $collection['amount'], 2) : $total;
 
         if (isset($collection['status']) && $collection['status'] === 'successful') {
             // Settled synchronously (rare): complete straight away,
@@ -253,19 +336,20 @@ class WC_Gateway_BMaGlass_Mobile_Money extends WC_Payment_Gateway
             $order->payment_complete($reference);
             $order->add_order_note(sprintf(
                 'Mobile money payment confirmed — %s ZMW, reference %s.',
-                number_format($total, 2),
+                number_format($charged, 2),
                 $reference
             ));
             $order->save();
         } else {
             $order->update_status('on-hold', sprintf(
-                'Mobile money: payment prompt sent to %s — waiting for the buyer to approve it (reference %s).',
+                'Mobile money: payment prompt sent to %s for %s ZMW — waiting for the buyer to approve it (reference %s).',
                 $phone,
+                number_format($charged, 2),
                 $reference
             ));
             $order->save();
             wc_add_notice(
-                sprintf('We\'ve sent a payment prompt to %s. Approve it with your mobile money PIN — your order confirms automatically once the payment lands.', $phone),
+                sprintf('We\'ve sent a payment prompt to %s for %s ZMW. Approve it with your mobile money PIN — your order confirms automatically once the payment lands.', $phone, number_format($charged, 2)),
                 'success'
             );
         }
