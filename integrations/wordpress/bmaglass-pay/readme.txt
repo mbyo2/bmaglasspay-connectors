@@ -4,7 +4,7 @@ Tags: payments, woocommerce, bmaglass, zambia, kwacha
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.1
+Stable tag: 1.2.0
 License: GPLv2 or later
 
 Accept BMaGlass Pay payments in WooCommerce. Buyers pay wallet-to-wallet on a hosted BMaGlass payment page; money lands in the same BMaGlass wallets (ZMW / USD) as your BMaGlass Pay app account.

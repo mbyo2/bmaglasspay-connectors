@@ -2,6 +2,11 @@
 
 namespace BMaGlass\Sdk;
 
+// Standalone use (no Composer autoloader): the client throws ApiException
+// on every error path, so load it here. require_once is a no-op when
+// Composer already autoloaded the class.
+require_once __DIR__ . '/ApiException.php';
+
 /**
  * BMaGlass Pay Developer API client (PHP).
  *
