@@ -193,7 +193,7 @@ def main() -> None:
     # Mirror integrations/wordpress/: tests/ beside bmaglass-pay/
     shutil.copytree(ROOT / "integrations" / "wordpress" / "tests",
                     wp_dir / "tests")
-    for suite, expect in (("run-client-tests.php", 38),
+    for suite, expect in (("run-client-tests.php", 49),
                           ("run-blocks-tests.php", 30),
                           ("run-reconciler-tests.php", 18)):
         rc, out = run(["php", f"tests/{suite}"], cwd=wp_dir)

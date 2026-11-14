@@ -60,7 +60,11 @@ class ControllerExtensionPaymentBmaglasspay extends Controller
                         'Order #' . $order_id,
                         (float) $order['total'],
                         $currency,
-                        'OpenCart order ' . $order_id
+                        'OpenCart order ' . $order_id,
+                        null,
+                        null,
+                        // "Return to store" on the hosted pay page after payment.
+                        $this->url->link('checkout/success')
                     );
                     $this->db->query('INSERT INTO `' . DB_PREFIX . 'bmaglasspay_orders` SET `order_id` = ' . $order_id
                         . ', `link_code` = \'' . $this->db->escape($link['link_code']) . '\', `paid` = 0');

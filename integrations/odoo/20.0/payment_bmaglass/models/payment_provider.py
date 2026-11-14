@@ -19,7 +19,7 @@ class PaymentProvider(models.Model):
     bmaglass_api_key = fields.Char(
         string="BMaGlass API key",
         help="Create a key in BMaGlass Pay (Business settings or the API page) with the "
-             "wallets:read, payment_links:read and payment_links:write scopes. "
+             "wallets:read, payment_links:read, payment_links:write and webhooks:write scopes. "
              "A production key (bmg_live_...) is required to take payments.",
         groups="base.group_system",
     )

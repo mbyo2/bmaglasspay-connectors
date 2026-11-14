@@ -18,87 +18,87 @@ Release version: **1.0.0**. Validated against the UNZIPPED zip contents (not the
 - OK bmaglasspay-magento-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-magento-1.0.0.zip: no bytecode
 - OK bmaglasspay-magento-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-magento-1.0.0.zip: 17347 bytes, sha256 `59474dd3a445d23f9fe5692dd86a08e2afb3356dbc409171f3e066fe8d08a421`, 16 files
+  - bmaglasspay-magento-1.0.0.zip: 17666 bytes, sha256 `969ff71309d4407dcf0e4d316fff6cd78457f3136d5aaa29c2b074eab5c92d63`, 16 files
 - OK bmaglasspay-odoo-16.0-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-odoo-16.0-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-odoo-16.0-1.0.0.zip: no bytecode
 - OK bmaglasspay-odoo-16.0-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-odoo-16.0-1.0.0.zip: 20573 bytes, sha256 `344040efd92d7caef284134aeb14909314d98062269a743c60113a2947909fdb`, 17 files
+  - bmaglasspay-odoo-16.0-1.0.0.zip: 20575 bytes, sha256 `ed524e9d8b461f3f2f2e4aa64d48a32949a4e2af4f589512f7624d00690d1d59`, 17 files
 - OK bmaglasspay-odoo-17.0-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-odoo-17.0-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-odoo-17.0-1.0.0.zip: no bytecode
 - OK bmaglasspay-odoo-17.0-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-odoo-17.0-1.0.0.zip: 21090 bytes, sha256 `7f750ca3b002b202ee943d9971837dea8e1b35d0eafd1056a37a08df0d15cf0a`, 18 files
+  - bmaglasspay-odoo-17.0-1.0.0.zip: 21092 bytes, sha256 `eff4e1b3349b09068479af71421c2baec3df8a91fa92b0392abd82b7e5797f47`, 18 files
 - OK bmaglasspay-odoo-18.0-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-odoo-18.0-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-odoo-18.0-1.0.0.zip: no bytecode
 - OK bmaglasspay-odoo-18.0-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-odoo-18.0-1.0.0.zip: 21059 bytes, sha256 `56f7f3291952574a35478d476f7991fe95aa0c9f0494bec07ac4388fec2bd01b`, 18 files
+  - bmaglasspay-odoo-18.0-1.0.0.zip: 21061 bytes, sha256 `6e761d599f279d0a2849cb7ce9a643dcb99f61ecb30940339ca44cdc4ceae4e5`, 18 files
 - OK bmaglasspay-odoo-19.0-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-odoo-19.0-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-odoo-19.0-1.0.0.zip: no bytecode
 - OK bmaglasspay-odoo-19.0-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-odoo-19.0-1.0.0.zip: 21233 bytes, sha256 `970e9839ec5892f40d01e0aaa9b414805f8167265ad1a50c5b7ad5ac6b666678`, 18 files
+  - bmaglasspay-odoo-19.0-1.0.0.zip: 21235 bytes, sha256 `1ead1e4f8c819fd02bed191a702e4798800aae48a69815db3e7e003c435faa2c`, 18 files
 - OK bmaglasspay-odoo-20.0-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-odoo-20.0-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-odoo-20.0-1.0.0.zip: no bytecode
 - OK bmaglasspay-odoo-20.0-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-odoo-20.0-1.0.0.zip: 23294 bytes, sha256 `e09343627346d3e6b1cbe244f549b04dfb292e0bb1fa3b605bf86ddba0324a6c`, 18 files
+  - bmaglasspay-odoo-20.0-1.0.0.zip: 23298 bytes, sha256 `62d6a85ee3372e7c01b708c5704c551ad104f4627a2beb85eaa595e1c8579068`, 18 files
 - OK bmaglasspay-opencart-3-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-opencart-3-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-opencart-3-1.0.0.zip: no bytecode
 - OK bmaglasspay-opencart-3-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-opencart-3-1.0.0.zip: 15067 bytes, sha256 `04a3d2f46941fb5cf9fdb8c5b7d46f7195d29fdc026bc308440064655acfda63`, 11 files
+  - bmaglasspay-opencart-3-1.0.0.zip: 15388 bytes, sha256 `8bb1694ee99e9edd1e5cafdcf78abe793e3a48ae5d24b352368105adb5004452`, 11 files
 - OK bmaglasspay-opencart-4-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-opencart-4-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-opencart-4-1.0.0.zip: no bytecode
 - OK bmaglasspay-opencart-4-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-opencart-4-1.0.0.zip: 14304 bytes, sha256 `f94cbdadc684157896266b60abbab507241fbab4e9ced5aa893cce71100d66ad`, 10 files
+  - bmaglasspay-opencart-4-1.0.0.zip: 14621 bytes, sha256 `9f08e44a27601b16c85ddbf89fdfd9e22b460aba84e8db45fea9784c46fc762d`, 10 files
 - OK bmaglasspay-prestashop-1.7-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-prestashop-1.7-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-prestashop-1.7-1.0.0.zip: no bytecode
 - OK bmaglasspay-prestashop-1.7-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-prestashop-1.7-1.0.0.zip: 13161 bytes, sha256 `f9c7c63400025c1db1cba2f9ae0b0b1379826e39f78683606b73ba4afd0dc264`, 8 files
+  - bmaglasspay-prestashop-1.7-1.0.0.zip: 13537 bytes, sha256 `a924ec5daf6a62195140cac04f4aea37b6039a408c74596fdf50307e7e09df84`, 8 files
 - OK bmaglasspay-prestashop-8-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-prestashop-8-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-prestashop-8-1.0.0.zip: no bytecode
 - OK bmaglasspay-prestashop-8-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-prestashop-8-1.0.0.zip: 13131 bytes, sha256 `bc08fd47acdaee6d68c4c87404b35b066bd299946c7e46061cc1f63c988a7205`, 8 files
+  - bmaglasspay-prestashop-8-1.0.0.zip: 13507 bytes, sha256 `4d62cfd2b772cd4b163f889e42302016e39921374e82618366ff0fc648e42f2f`, 8 files
 - OK bmaglasspay-prestashop-9-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-prestashop-9-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-prestashop-9-1.0.0.zip: no bytecode
 - OK bmaglasspay-prestashop-9-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-prestashop-9-1.0.0.zip: 13486 bytes, sha256 `bffffc681b26fe340cf5fbd1d12a446fabc3416cce1552373a0eef9da5a79e0d`, 9 files
+  - bmaglasspay-prestashop-9-1.0.0.zip: 13862 bytes, sha256 `e902270c02b9e275ffbb1a6fc0be09fe7bbab1635ee016119221c45b4c7a381d`, 9 files
 - OK bmaglasspay-sdk-flutter-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-sdk-flutter-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-flutter-1.0.0.zip: no bytecode
 - OK bmaglasspay-sdk-flutter-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-sdk-flutter-1.0.0.zip: 11151 bytes, sha256 `684aceafd6022edd24d4cc4f0aaedcecfefde61641e2c2634bb0de25d16937db`, 9 files
+  - bmaglasspay-sdk-flutter-1.0.0.zip: 12208 bytes, sha256 `78c1add46eb30142a35f5b73b89bd6e32f01cd48245c55b81e2492100d114adc`, 9 files
 - OK bmaglasspay-sdk-php-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-sdk-php-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-php-1.0.0.zip: no bytecode
 - OK bmaglasspay-sdk-php-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-sdk-php-1.0.0.zip: 11133 bytes, sha256 `af709c37c4e174ba593d4f006d569b8e80670c9643483608b0ab9af0d540c714`, 6 files
+  - bmaglasspay-sdk-php-1.0.0.zip: 11900 bytes, sha256 `8ed2e59d1e0ca46c10937c4103f74a3020dfcbcc069d38a9d0411da50204c23a`, 6 files
 - OK bmaglasspay-sdk-python-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-sdk-python-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-python-1.0.0.zip: no bytecode
 - OK bmaglasspay-sdk-python-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-sdk-python-1.0.0.zip: 4556 bytes, sha256 `70a3b616d168a9e0b50b0c7588835c340421fdd5dad904ef6eb8580c2fb0635e`, 4 files
+  - bmaglasspay-sdk-python-1.0.0.zip: 4837 bytes, sha256 `4c1090b0973806e713048e143f34a177298e3f9e86bcb2e398397a6f4d2c48c9`, 4 files
 - OK bmaglasspay-sdk-react-native-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-sdk-react-native-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-react-native-1.0.0.zip: no bytecode
 - OK bmaglasspay-sdk-react-native-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-sdk-react-native-1.0.0.zip: 11389 bytes, sha256 `db10e40dde97f894f7a2f1704d4325f738cc1d97bb4b8f7bb8de0a582517f585`, 7 files
+  - bmaglasspay-sdk-react-native-1.0.0.zip: 12216 bytes, sha256 `b9bb3bd3a8337b96f5aa57f89722501ae8573d6bdd47f46bd9d799de6cd56089`, 7 files
 - OK bmaglasspay-sdk-typescript-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-sdk-typescript-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-typescript-1.0.0.zip: no bytecode
 - OK bmaglasspay-sdk-typescript-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-sdk-typescript-1.0.0.zip: 12954 bytes, sha256 `da584225fc896f1d48786da32918f415d5eaa3ea7b1d0014cd86a52b38df3363`, 8 files
+  - bmaglasspay-sdk-typescript-1.0.0.zip: 14078 bytes, sha256 `c48cb19e5ef40265808c0844b0f11b1b79b243ac85dff0507b0ae4c753a8029d`, 8 files
 - OK bmaglasspay-woocommerce-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-woocommerce-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-woocommerce-1.0.0.zip: no bytecode
 - OK bmaglasspay-woocommerce-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-woocommerce-1.0.0.zip: 30014 bytes, sha256 `f9ddf0783258b5e76e1ed79b2cc35cfbe18b89bfa21e759c76c247786d7fc6b2`, 12 files
+  - bmaglasspay-woocommerce-1.0.0.zip: 30379 bytes, sha256 `9805e610cdf9f18050aaf9ac8b3b7b0809a6cf22422ac5ea13af993da910c260`, 12 files
 ## Store modules — scripts/validate-store-zips.py
 
 Validator exit code: 0
@@ -410,7 +410,7 @@ Repo-level checks are reported above for the record and do not change the zip ve
 
 ## WooCommerce — mocked-WP suites (unzipped zip)
 
-- run-client-tests.php: rc=0, 38 PASS / 0 FAIL (expected 38 PASS / 0 FAIL)
+- run-client-tests.php: rc=0, 49 PASS / 0 FAIL (expected 49 PASS / 0 FAIL)
 ```
 PASS  test key mode (got 'test')
 PASS  live key mode (got 'live')
@@ -426,13 +426,24 @@ PASS  link code returned (got 'ABC123')
 PASS  currency upper-cased (got 'ZMW')
 PASS  amount shaped (got 10.5)
 PASS  hosted link URL (got 'https://bmaglasspay.online/pay/ABC123')
-PASS  test-key write status (got 403)
-PASS  test-key write code (got 'test_mode_read_only')
+PASS  sandbox link fee_payer (got 'buyer')
+PASS  sandbox link redirect_url (got 'https://example.invalid/return')
+PASS  sandbox link fee_amount (got 0.25)
+PASS  sandbox link buyer_total (got 10.25)
+PASS  sandbox link seller_receives (got 10)
+PASS  default link fee_payer (got 'seller')
+PASS  default link seller_receives (got 9.75)
+PASS  fee_payer omitted by default (got false)
+PASS  bad fee_payer code (got 'invalid_fee_payer')
+PASS  test-key transfer status (got 403)
+PASS  test-key transfer code (got 'test_mode_read_only')
 PASS  isTestModeReadOnly
 PASS  userMessage is honest about test keys
+PASS  sandbox webhook id (got 'wh1')
+PASS  sandbox webhook secret (got 'whsec_testsecret')
 PASS  EUR error code (got 'unsupported_currency')
 PASS  EUR message names the problem
-PASS  guard fired before transport (got 5)
+PASS  guard fired before transport (got 8)
 PASS  Idempotency-Key header sent
 PASS  collection reference returned (got 'BMG-TESTCOLL1')
 PASS  collection starts pending (got 'pending')
@@ -526,13 +537,14 @@ test_bitcoin_and_webhooks (test_python_sdk.SdkContractTest.test_bitcoin_and_webh
 test_connector_config_and_sandbox_invoices (test_python_sdk.SdkContractTest.test_connector_config_and_sandbox_invoices) ... ok
 test_mobile_money_collections (test_python_sdk.SdkContractTest.test_mobile_money_collections) ... ok
 test_mode_detection (test_python_sdk.SdkContractTest.test_mode_detection) ... ok
+test_payment_link_fee_payer_override (test_python_sdk.SdkContractTest.test_payment_link_fee_payer_override) ... ok
 test_settings_and_attempts (test_python_sdk.SdkContractTest.test_settings_and_attempts) ... ok
 test_transfer_test_mode_error_is_typed (test_python_sdk.SdkContractTest.test_transfer_test_mode_error_is_typed) ... ok
 test_wallets_sends_key_header (test_python_sdk.SdkContractTest.test_wallets_sends_key_header) ... ok
 test_known_answer_vector (test_python_sdk.WebhookVerifyTest.test_known_answer_vector) ... ok
 
 ----------------------------------------------------------------------
-Ran 8 tests
+Ran 9 tests
 
 OK
 ```
@@ -557,7 +569,16 @@ PASS  settings paypal rate (got 1)
 PASS  attempts status (got 'waiting')
 PASS  link code (got 'ABC123')
 PASS  link URL (got 'https://bmaglasspay.online/pay/ABC123')
-PASS  test-key code (got 'test_mode_read_only')
+PASS  sandbox link fee_payer (got 'buyer')
+PASS  sandbox link redirect_url (got 'https://example.invalid/return')
+PASS  sandbox link fee_amount (got 0.25)
+PASS  sandbox link buyer_total (got 10.25)
+PASS  sandbox link seller_receives (got 10)
+PASS  default link fee_payer (got 'seller')
+PASS  default link seller_receives (got 9.75)
+PASS  fee_payer sent (got 'seller')
+PASS  bad fee_payer code (got 'invalid_fee_payer')
+PASS  test-key transfer code (got 'test_mode_read_only')
 PASS  userMessage honest
 PASS  EUR code (got 'unsupported_currency')
 PASS  Idempotency-Key header
@@ -587,7 +608,10 @@ PASS  bmg live environment is production
 PASS  wallets balance
 PASS  settings fee default
 PASS  attempts
-PASS  test-key write throws typed error
+PASS  sandbox link fee_payer
+PASS  sandbox link redirect_url
+PASS  default link fee_payer
+PASS  test-key transfer throws typed error
 PASS  userMessage honest
 PASS  EUR refused client-side
 PASS  foreign key rejected
@@ -605,9 +629,10 @@ ALL REACT NATIVE SDK TESTS PASSED
 00:00 +5: test/bmaglass_sdk_test.dart: client wallets parse
 00:00 +6: test/bmaglass_sdk_test.dart: client settings and attempts
 00:00 +7: test/bmaglass_sdk_test.dart: client payment link create (live key)
-00:00 +8: test/bmaglass_sdk_test.dart: client test-key write maps to crafted message
-00:00 +9: test/bmaglass_sdk_test.dart: client unsupported currency refused client-side
-00:00 +10: All tests passed!
+00:00 +8: test/bmaglass_sdk_test.dart: client sandbox key creates payment links (live API, proven 2026-11-14)
+00:00 +9: test/bmaglass_sdk_test.dart: client test-key transfer maps to crafted message
+00:00 +10: test/bmaglass_sdk_test.dart: client unsupported currency refused client-side
+00:00 +11: All tests passed!
 ```
 - Embed button: test-embed.mjs rc=0
 ```
