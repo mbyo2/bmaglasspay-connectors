@@ -37,8 +37,8 @@ try {
 ## Honest limits & security
 
 - **Sandbox keys use simulated money**: reads, sandbox object
-  creation + simulation work (webhook registration needs a production
-  key — sandbox keys get `403 test_mode_read_only`); real-money
+  creation + simulation work (webhook registration works too —
+  sandbox endpoints receive sandbox events); real-money
   writes throw `test_mode_read_only`.
 - **Currencies:** ZMW and USD only; anything else throws
   `unsupported_currency` client-side — no FX rate is ever invented.
