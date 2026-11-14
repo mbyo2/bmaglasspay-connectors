@@ -184,19 +184,31 @@ class BMaGlass {
 
   /// POST /payment-links — create a hosted payment link (sandbox keys
   /// create links too; only settlement is simulation-only).
+  /// [feePayer] ("seller" | "buyer") overrides the merchant default
+  /// from `settings()` for this link only: "seller" — the fee comes out
+  /// of what the seller receives; "buyer" — the fee is added on top and
+  /// the seller receives the full price. [redirectUrl] is the buyer
+  /// return URL the hosted pay page offers after payment.
   Future<PaymentLink> createPaymentLink({
     required String title,
     double? amount,
     String currency = 'ZMW',
     String? description,
     String? expiresAt,
+    String? feePayer,
+    String? redirectUrl,
   }) async {
+    if (feePayer != null && feePayer != 'seller' && feePayer != 'buyer') {
+      throw const BMaGlassException(0, 'invalid_fee_payer', "feePayer must be 'seller' or 'buyer'.");
+    }
     final body = <String, dynamic>{
       'title': title,
       'currency': assertSupportedCurrency(currency),
       if (amount != null) 'amount': amount,
       if (description != null) 'description': description,
       if (expiresAt != null) 'expires_at': expiresAt,
+      if (feePayer != null) 'fee_payer': feePayer,
+      if (redirectUrl != null) 'redirect_url': redirectUrl,
     };
     final data = await _request('POST', 'payment-links', body: body) as Map<String, dynamic>;
     return PaymentLink.fromJson(data);

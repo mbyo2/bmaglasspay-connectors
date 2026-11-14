@@ -110,7 +110,21 @@ class _Transfers:
 class _PaymentLinks:
     def __init__(self, c: BMaGlass): self.c = c
     def list(self): return self.c._request("GET", "payment-links")
-    def create(self, title: str, **kwargs): return self.c._request("POST", "payment-links", {"title": title, **kwargs})
+    def create(self, title: str, fee_payer: Optional[str] = None, redirect_url: Optional[str] = None, **kwargs):
+        """Create a payment link. ``fee_payer`` ("seller" | "buyer") overrides
+        the merchant default from ``settings.get()`` for this link only —
+        "seller": the fee comes out of what the seller receives; "buyer":
+        the fee is added on top and the seller receives the full price.
+        ``redirect_url`` is the buyer return URL the hosted pay page offers
+        after payment. Other keyword arguments pass through to the API."""
+        body: dict[str, Any] = {"title": title, **kwargs}
+        if fee_payer is not None:
+            if fee_payer not in ("seller", "buyer"):
+                raise BMaGlassError(0, "invalid_fee_payer", "fee_payer must be 'seller' or 'buyer'.")
+            body["fee_payer"] = fee_payer
+        if redirect_url is not None:
+            body["redirect_url"] = redirect_url
+        return self.c._request("POST", "payment-links", body)
     def attempts(self, link_id: str): return self.c._request("GET", f"payment-links/{link_id}/attempts")
     def simulate_payment(self, link_id: str):
         """Sandbox only: mark one simulated payment on a sandbox link (fires payment_link.paid, flagged simulated)."""

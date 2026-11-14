@@ -55,6 +55,23 @@ class FakeSession:
             return FakeResponse(200, {"data": {"fee_payer_default": "seller", "platform_fee_percent": 2.5, "paypal_platform_fee_percent": 1, "note": "n"}, "mode": "test"})
         if url.endswith("/payment-links/link1/attempts"):
             return FakeResponse(200, {"data": [{"id": "att1", "status": "waiting"}], "mode": "test"})
+        if url.endswith("/payment-links") and method == "POST":
+            # Sandbox keys CAN create payment links (settlement is simulation-only);
+            # only transfers/webhook registration are live-only. The stub echoes
+            # the per-link fee_payer + redirect_url and the resolved fee maths.
+            req = json.loads(data or "{}")
+            fee_payer = req.get("fee_payer", "seller")
+            fee = round((req.get("amount") or 0) * 0.025, 2)
+            amount = req.get("amount") or 0
+            return FakeResponse(201, {"data": {"id": "pl1", "title": req.get("title"), "amount": amount,
+                                               "currency": req.get("currency", "ZMW"), "link_code": "ABC123",
+                                               "status": "active", "fee_payer": fee_payer,
+                                               "redirect_url": req.get("redirect_url"),
+                                               "payment_count": 0, "total_collected": 0,
+                                               "fee_amount": fee,
+                                               "buyer_total": amount + fee if fee_payer == "buyer" else amount,
+                                               "seller_receives": amount - fee if fee_payer == "seller" else amount},
+                                        "mode": "test"})
         if url.endswith("/mobile-money/collections") and method == "POST":
             req = json.loads(data or "{}")
             return FakeResponse(201, {"data": {"reference": "BMG-C1", "merchant_reference": req.get("reference"),
@@ -120,6 +137,25 @@ class SdkContractTest(unittest.TestCase):
         settled = self.client.mobile_money.get_collection("BMG-C1")
         self.assertEqual(settled["status"], "successful")
         self.assertEqual(settled["wallet_balance"], 99)
+
+    def test_payment_link_fee_payer_override(self):
+        # Per-link fee_payer override + redirect_url (live API, proven 2026-11-14):
+        # a sandbox key creates the link; the resolved fee maths ride on the row.
+        link = self.client.payment_links.create("Order #8", amount=10, currency="ZMW",
+                                                fee_payer="buyer", redirect_url="https://example.invalid/return")
+        self.assertEqual(link["fee_payer"], "buyer")
+        self.assertEqual(link["redirect_url"], "https://example.invalid/return")
+        self.assertEqual(link["fee_amount"], 0.25)
+        self.assertEqual(link["buyer_total"], 10.25)
+        self.assertEqual(link["seller_receives"], 10)
+        sent = json.loads(self.session.calls[-1]["data"])
+        self.assertEqual(sent["fee_payer"], "buyer")
+        self.assertEqual(sent["redirect_url"], "https://example.invalid/return")
+        seller_link = self.client.payment_links.create("Order #9", amount=10, currency="ZMW")
+        self.assertEqual(seller_link["fee_payer"], "seller")
+        self.assertEqual(seller_link["seller_receives"], 9.75)
+        with self.assertRaises(BMaGlassError):
+            self.client.payment_links.create("Bad", amount=10, fee_payer="nobody")
 
     def test_settings_and_attempts(self):
         settings = self.client.settings.get()

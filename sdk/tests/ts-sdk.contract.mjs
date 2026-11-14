@@ -22,6 +22,15 @@ const server = createServer((req, res) => {
     if (req.url?.startsWith("/transactions")) return reply(200, { data: [], mode: "test" });
     if (req.url === "/transfers") return reply(403, { error: "test_mode_read_only", message: "Test keys are read-only" });
     if (req.url === "/payment-links" && req.method === "GET") return reply(200, { data: [], mode: "test" });
+    if (req.url === "/payment-links" && req.method === "POST") {
+      // Sandbox keys CAN create payment links (settlement is simulation-only);
+      // only transfers/webhook registration are live-only. The stub echoes the
+      // per-link fee_payer + redirect_url and the resolved fee maths, as live does.
+      const b = JSON.parse(body || "{}");
+      const feePayer = b.fee_payer ?? "seller";
+      const fee = Math.round((b.amount ?? 0) * 0.025 * 100) / 100;
+      return reply(201, { data: { id: "pl1", title: b.title, description: b.description ?? null, amount: b.amount ?? null, currency: b.currency ?? "ZMW", link_code: "ABC123", status: "active", fee_payer: feePayer, redirect_url: b.redirect_url ?? null, payment_count: 0, total_collected: 0, expires_at: b.expires_at ?? null, created_at: "t", fee_amount: fee, buyer_total: feePayer === "buyer" ? (b.amount ?? 0) + fee : (b.amount ?? 0), seller_receives: feePayer === "seller" ? (b.amount ?? 0) - fee : (b.amount ?? 0) }, mode: "test" });
+    }
     if (req.url === "/bitcoin/balance") return reply(200, { data: [{ asset: "BTC", balance_sats: 1000, available_sats: 1000, updated_at: "z" }], mode: "test" });
     if (req.url === "/webhooks" && req.method === "POST") return reply(201, { data: { id: "wh1", url: "https://example.com/hook", events: ["webhook.test"], is_active: true, created_at: "t", secret: "whsec_testsecret" }, mode: "test" });
     if (req.url === "/settings") return reply(200, { data: { fee_payer_default: "seller", platform_fee_percent: 2.5, paypal_platform_fee_percent: 1, note: "n" }, mode: "test" });
@@ -63,6 +72,18 @@ await assert.rejects(() => client.transfers.create({ to_user_id: "u2", amount: 1
   (e) => e instanceof BMaGlassError && e.status === 403 && e.code === "test_mode_read_only");
 assert.equal(seen.at(-1).idem, "idem-1");
 assert.deepEqual(await client.paymentLinks.list(), []);
+// Per-link fee_payer override + redirect_url (live API, proven 2026-11-14):
+// a sandbox key creates the link; the resolved fee maths ride on the row.
+const feeLink = await client.paymentLinks.create({ title: "Order #8", amount: 10, currency: "ZMW", fee_payer: "buyer", redirect_url: "https://example.invalid/return" });
+assert.equal(feeLink.fee_payer, "buyer");
+assert.equal(feeLink.redirect_url, "https://example.invalid/return");
+assert.equal(feeLink.fee_amount, 0.25);
+assert.equal(feeLink.buyer_total, 10.25);
+assert.equal(feeLink.seller_receives, 10);
+assert.deepEqual(JSON.parse(seen.at(-1).body), { title: "Order #8", amount: 10, currency: "ZMW", fee_payer: "buyer", redirect_url: "https://example.invalid/return" });
+const sellerLink = await client.paymentLinks.create({ title: "Order #9", amount: 10, currency: "ZMW" });
+assert.equal(sellerLink.fee_payer, "seller");
+assert.equal(sellerLink.seller_receives, 9.75);
 assert.equal((await client.bitcoin.balance())[0].balance_sats, 1000);
 const hook = await client.webhooks.create({ url: "https://example.com/hook" });
 assert.equal(hook.secret, "whsec_testsecret");

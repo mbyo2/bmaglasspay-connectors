@@ -56,13 +56,19 @@ $transport = function ($method, $url, $headers, $body) use (&$calls) {
         return array(200, json_encode(array('data' => array(array('id' => 'w1', 'currency' => 'ZMW', 'balance' => 42)), 'mode' => 'test')));
     }
     if (str_ends_with($url, '/payment-links') && $method === 'POST') {
-        if (strpos($flat, 'bmp_test_') !== false) {
-            return array(403, json_encode(array('error' => 'test_mode_read_only', 'message' => 'Test keys are read-only')));
-        }
+        // Sandbox keys CAN create payment links (settlement is simulation-only);
+        // only transfers/webhook registration are live-only. The stub echoes the
+        // per-link fee_payer + redirect_url and the resolved fee maths, as live does.
         $req = json_decode($body, true);
-        return array(201, json_encode(array('data' => array('id' => 'pl1', 'title' => $req['title'], 'amount' => $req['amount'], 'currency' => $req['currency'], 'link_code' => 'ABC123'), 'mode' => 'live')));
+        $feePayer = isset($req['fee_payer']) ? $req['fee_payer'] : 'seller';
+        $fee = round(($req['amount'] ?? 0) * 0.025, 2);
+        $amount = $req['amount'] ?? 0;
+        return array(201, json_encode(array('data' => array('id' => 'pl1', 'title' => $req['title'], 'amount' => $amount, 'currency' => $req['currency'], 'link_code' => 'ABC123', 'status' => 'active', 'fee_payer' => $feePayer, 'redirect_url' => isset($req['redirect_url']) ? $req['redirect_url'] : null, 'payment_count' => 0, 'total_collected' => 0, 'fee_amount' => $fee, 'buyer_total' => $feePayer === 'buyer' ? $amount + $fee : $amount, 'seller_receives' => $feePayer === 'seller' ? $amount - $fee : $amount), 'mode' => 'test')));
     }
     if (str_ends_with($url, '/transfers')) {
+        if (strpos($flat, 'bmp_test_') !== false || strpos($flat, 'bmg_sandbox_') !== false) {
+            return array(403, json_encode(array('error' => 'test_mode_read_only', 'message' => 'Test keys are read-only')));
+        }
         return array(201, json_encode(array('data' => array('transaction_id' => 'tx1'), 'mode' => 'live')));
     }
     if (str_ends_with($url, '/settings')) {
@@ -114,11 +120,33 @@ $link = $live->createPaymentLink('Order #7', 10.5, 'zmw');
 eq('link code', $link['link_code'], 'ABC123');
 eq('link URL', Client::paymentLinkUrl('ABC123'), 'https://bmaglasspay.online/pay/ABC123');
 
+// Sandbox keys CAN create payment links (live API, proven 2026-11-14);
+// only transfers/webhook registration are live-only.
+$sandboxLink = $test->createPaymentLink('Order #8', 10, 'ZMW', null, null, 'buyer', 'https://example.invalid/return');
+eq('sandbox link fee_payer', $sandboxLink['fee_payer'], 'buyer');
+eq('sandbox link redirect_url', $sandboxLink['redirect_url'], 'https://example.invalid/return');
+eq('sandbox link fee_amount', $sandboxLink['fee_amount'], 0.25);
+eq('sandbox link buyer_total', $sandboxLink['buyer_total'], 10.25);
+eq('sandbox link seller_receives', $sandboxLink['seller_receives'], 10);
+$sellerLink = $test->createPaymentLink('Order #9', 10, 'ZMW');
+eq('default link fee_payer', $sellerLink['fee_payer'], 'seller');
+eq('default link seller_receives', $sellerLink['seller_receives'], 9.75);
+$last = end($calls);
+$sent = json_decode($last['body'], true);
+eq('fee_payer sent', $sent['fee_payer'] ?? 'seller', 'seller');
+
 try {
-    $test->createPaymentLink('Nope', 5, 'ZMW');
-    check('test-key write throws', false);
+    $test->createPaymentLink('Bad', 10, 'ZMW', null, null, 'nobody');
+    check('bad fee_payer refused', false);
 } catch (ApiException $e) {
-    eq('test-key code', $e->errorCode, 'test_mode_read_only');
+    eq('bad fee_payer code', $e->errorCode, 'invalid_fee_payer');
+}
+
+try {
+    $test->createTransfer('user-2', 25, 'ZMW');
+    check('test-key transfer throws', false);
+} catch (ApiException $e) {
+    eq('test-key transfer code', $e->errorCode, 'test_mode_read_only');
     check('userMessage honest', strpos($e->userMessage(), 'sandbox key') !== false);
 }
 

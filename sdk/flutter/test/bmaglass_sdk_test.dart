@@ -49,11 +49,13 @@ http.Client stubClient() {
           200);
     }
     if (req.url.path.endsWith('/payment-links') && req.method == 'POST') {
-      if (key.startsWith('bmp_test_') || key.startsWith('bmg_sandbox_')) {
-        return http.Response(
-            jsonEncode({'error': 'test_mode_read_only', 'message': 'Test keys are read-only'}), 403);
-      }
+      // Sandbox keys CAN create payment links (settlement is simulation-only);
+      // only transfers/webhook registration are live-only. The stub echoes the
+      // per-link fee_payer + redirect_url and the resolved fee maths, as live does.
       final body = jsonDecode(req.body) as Map<String, dynamic>;
+      final feePayer = (body['fee_payer'] as String?) ?? 'seller';
+      final amount = (body['amount'] as num?)?.toDouble() ?? 0;
+      final fee = (amount * 0.025 * 100).round() / 100;
       return http.Response(
           jsonEncode({
             'data': {
@@ -63,12 +65,25 @@ http.Client stubClient() {
               'currency': body['currency'],
               'link_code': 'ABC123',
               'status': 'active',
+              'fee_payer': feePayer,
+              'redirect_url': body['redirect_url'],
               'payment_count': 0,
-              'total_collected': 0
+              'total_collected': 0,
+              'fee_amount': fee,
+              'buyer_total': feePayer == 'buyer' ? amount + fee : amount,
+              'seller_receives': feePayer == 'seller' ? amount - fee : amount,
             },
-            'mode': 'live'
+            'mode': 'test'
           }),
           201);
+    }
+    if (req.url.path.endsWith('/transfers') && req.method == 'POST') {
+      if (key.startsWith('bmp_test_') || key.startsWith('bmg_sandbox_')) {
+        return http.Response(
+            jsonEncode({'error': 'test_mode_read_only', 'message': 'Test keys are read-only'}), 403);
+      }
+      return http.Response(
+          jsonEncode({'data': {'transaction_id': 'tx1'}, 'mode': 'live'}), 201);
     }
     return http.Response(jsonEncode({'error': 'not_found', 'message': 'no route'}), 404);
   });
@@ -121,10 +136,27 @@ void main() {
       expect(link.linkCode, 'ABC123');
       expect(BMaGlass.paymentLinkUrl('ABC123'), 'https://bmaglasspay.online/pay/ABC123');
     });
-    test('test-key write maps to crafted message', () async {
+    test('sandbox key creates payment links (live API, proven 2026-11-14)', () async {
+      // Only transfers/webhook registration are live-only; sandbox links
+      // settle via simulation.
+      final client = BMaGlass(apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', httpClient: stubClient());
+      final link = await client.createPaymentLink(
+          title: 'Order #8', amount: 10, currency: 'ZMW', feePayer: 'buyer', redirectUrl: 'https://example.invalid/return');
+      expect(link.feePayer, 'buyer');
+      expect(link.redirectUrl, 'https://example.invalid/return');
+      expect(link.feeAmount, 0.25);
+      expect(link.buyerTotal, 10.25);
+      expect(link.sellerReceives, 10);
+      final sellerLink = await client.createPaymentLink(title: 'Order #9', amount: 10, currency: 'ZMW');
+      expect(sellerLink.feePayer, 'seller');
+      expect(sellerLink.sellerReceives, 9.75);
+      expect(() async => client.createPaymentLink(title: 'Bad', amount: 10, feePayer: 'nobody'),
+          throwsA(predicate((e) => e is BMaGlassException && e.code == 'invalid_fee_payer')));
+    });
+    test('test-key transfer maps to crafted message', () async {
       final client = BMaGlass(apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', httpClient: stubClient());
       try {
-        await client.createPaymentLink(title: 'Nope', amount: 5);
+        await client.createTransfer(toUserId: 'u2', amount: 5);
         fail('should have thrown');
       } on BMaGlassException catch (e) {
         expect(e.code, 'test_mode_read_only');

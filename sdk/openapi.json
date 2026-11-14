@@ -55,7 +55,7 @@
     }
   },
   "info": {
-    "description": "The shipped public developer API. Base URL is the developer-api edge function. Auth is an API key in the X-Api-Key header. Keys are created in the app (Business -> API); only the SHA-256 hash is stored and the full key is shown once.\n\nENVIRONMENTS: every key belongs to one environment, derived only from the key itself. Production keys (bmg_live_..., legacy bmp_live_...) move real money. Sandbox keys (bmg_sandbox_..., legacy bmp_test_...) run on mainnet formats with simulated money: API-created objects (invoices, payment links, webhook endpoints) are segregated per environment and never listed across environments, and a sandbox payment reaches paid only through the simulate-payment endpoints, which fire the normal webhook flow flagged simulated. Sandbox activity never touches a real wallet, ledger or chain. Legacy bmp_test_ keys are sandbox keys under this model (they gain the sandbox simulation flows; the historical read-only test mode no longer exists). Real-money transfers stay production-only: a sandbox key attempting one gets 403 test_mode_read_only.\n\nKEY SCOPES are least-privilege: config:read, invoices:create, invoices:read, webhooks:manage, plus the read/write scopes for wallets, transactions, payment links, bitcoin and transfers. No scope can withdraw, pay out, change a settlement destination, change the business country, or manage keys.\n\nNot available via the API (documented honestly): MoonPay and virtual-card issuing to third parties.",
+    "description": "The shipped public developer API. Base URL is the developer-api edge function. Auth is an API key in the X-Api-Key header. Keys are created in the app (Business -> API); only the SHA-256 hash is stored and the full key is shown once.\n\nENVIRONMENTS: every key belongs to one environment, derived only from the key itself. Production keys (bmg_live_..., legacy bmp_live_...) move real money. Sandbox keys (bmg_sandbox_..., legacy bmp_test_...) run on mainnet formats with simulated money: API-created objects (invoices, payment links, webhook endpoints) are segregated per environment and never listed across environments, and a sandbox payment reaches paid only through the simulate-payment endpoints, which fire the normal webhook flow flagged simulated. Sandbox activity never touches a real wallet, ledger or chain. Legacy bmp_test_ keys are sandbox keys under this model (they gain the sandbox simulation flows; the historical read-only test mode no longer exists). Real-money transfers stay production-only: a sandbox key attempting one gets 403 test_mode_read_only.\n\nKEY SCOPES are least-privilege: config:read, invoices:create, invoices:read, webhooks:manage, plus the read/write scopes for wallets, transactions, payment links, bitcoin, mobile money and transfers. No scope can withdraw, pay out, change a settlement destination, change the business country, or manage keys.\n\nNot available via the API (documented honestly): MoonPay and virtual-card issuing to third parties.",
     "title": "BMaGlass Pay Developer API",
     "version": "1.0.0"
   },
@@ -195,7 +195,7 @@
             "description": "Missing scope or test key"
           }
         },
-        "summary": "Create a payment link"
+        "summary": "Create a payment link (live keys only)"
       }
     },
     "/settings": {
@@ -383,7 +383,7 @@
         "summary": "List webhook endpoints (secrets are never returned)"
       },
       "post": {
-        "description": "HTTPS URLs only. The signing secret (whsec_\u2026) is returned exactly once in this response. Events: transaction.completed, payment_link.created, payment_link.paid, webhook.test. Allowed with test keys (no money moves). The payment_link.paid payload's data carries the link id/code/title, the amount and currency, the fee truth (fee_payer, fee_amount and total_charged \u2014 what the buyer actually paid in total, so a shop can reconcile the paid total against its order total plus the fee where it added one), the settlement transaction ids and the link's current payment_count/total_collected.",
+        "description": "HTTPS URLs only. The signing secret (whsec_\u2026) is returned exactly once in this response. Events: transaction.completed, payment_link.created, payment_link.paid, invoice.created, invoice.paid, mobile_money.collection.completed, webhook.test. Allowed with test keys (no money moves). The payment_link.paid payload's data carries the link id/code/title, the amount and currency, the fee truth (fee_payer, fee_amount and total_charged \u2014 what the buyer actually paid in total, so a shop can reconcile the paid total against its order total plus the fee where it added one), the settlement transaction ids and the link's current payment_count/total_collected.",
         "operationId": "createWebhook",
         "requestBody": {
           "content": {
@@ -493,7 +493,7 @@
     },
     "/connector/config": {
       "get": {
-        "description": "Authenticated by the pasted key alone \u2014 there is no business parameter. Returns the environment (from the key), the business's display name, country (ISO 3166-1 alpha-2, resolved from the saved record), currency and status, feature states, and the settlement type/currency. Feature states: enabled | disabled | not_entitled | pending_verification, with a machine-readable reason_code. mobile_money is Zambia-only: not_entitled/country_not_eligible for businesses whose saved country is not Zambia (ZM), disabled when a Zambian business has not switched it on, enabled when it has. Never returns balances, settlement destinations, account/mobile numbers or personal data. Supports ETag/If-None-Match (304) and Cache-Control: private, max-age=300. Gates are re-checked server-side on every money call; this payload only tells a connector what to render.",
+        "description": "Authenticated by the pasted key alone \u2014 there is no business parameter. Returns the environment (from the key), the business's display name, country (ISO 3166-1 alpha-2, resolved from the saved record), currency and status, feature states, and the settlement type/currency. Feature states: enabled | disabled | not_entitled | pending_verification, with a machine-readable reason_code. mobile_money is Zambia-only: not_entitled/country_not_eligible for businesses whose saved country is not Zambia (ZM), disabled when a Zambian business has not switched it on, enabled when it has. features.mobile_money also carries fee_bearer ('seller' | 'buyer', read-only): who pays the 1% service charge on a collection \u2014 when 'buyer', the buyer is charged the product amount plus the charge and the merchant receives the full product amount; when 'seller', the buyer pays the product amount and the charge is collected from the merchant's wallet after settlement. Never returns balances, settlement destinations, account/mobile numbers or personal data. Supports ETag/If-None-Match (304) and Cache-Control: private, max-age=300. Gates are re-checked server-side on every money call; this payload only tells a connector what to render.",
         "responses": {
           "200": {
             "content": {
@@ -812,7 +812,7 @@
             "description": "Idempotent replay: the original collection for this reference."
           },
           "201": {
-            "description": "The collection (status pending until the customer approves; may already be settled)."
+            "description": "The collection (status pending until the customer approves; may already be settled). It carries amount (the total charged to the buyer), base_amount (the product amount the 1% service charge is computed on), service_charge and fee_bearer ('seller' | 'buyer'): when the merchant chose buyer-pays, amount = base_amount + service_charge and the merchant receives the full base_amount; when seller-pays, amount = base_amount and the charge is collected from the merchant's wallet after settlement."
           },
           "400": {
             "description": "invalid_request / business_not_set_up / not_configured"
