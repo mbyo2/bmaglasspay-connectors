@@ -26,6 +26,22 @@ class PaymentLink {
   final int paymentCount;
   final double totalCollected;
 
+  /// Who funds the platform fee on this link ("seller" | "buyer") —
+  /// the merchant default from `settings()` unless overridden at creation.
+  final String? feePayer;
+
+  /// Buyer return URL offered by the hosted pay page after payment, when set.
+  final String? redirectUrl;
+
+  /// Platform fee on the link amount (2.5% link rate), in the link currency.
+  final double? feeAmount;
+
+  /// What the buyer pays in total (amount + fee when feePayer is "buyer").
+  final double? buyerTotal;
+
+  /// What the seller receives after the fee (amount − fee when feePayer is "seller").
+  final double? sellerReceives;
+
   const PaymentLink({
     required this.id,
     required this.title,
@@ -35,6 +51,11 @@ class PaymentLink {
     required this.status,
     required this.paymentCount,
     required this.totalCollected,
+    this.feePayer,
+    this.redirectUrl,
+    this.feeAmount,
+    this.buyerTotal,
+    this.sellerReceives,
   });
 
   factory PaymentLink.fromJson(Map<String, dynamic> json) => PaymentLink(
@@ -46,6 +67,11 @@ class PaymentLink {
         status: json['status'] as String,
         paymentCount: (json['payment_count'] as num?)?.toInt() ?? 0,
         totalCollected: (json['total_collected'] as num?)?.toDouble() ?? 0,
+        feePayer: json['fee_payer'] as String?,
+        redirectUrl: json['redirect_url'] as String?,
+        feeAmount: (json['fee_amount'] as num?)?.toDouble(),
+        buyerTotal: (json['buyer_total'] as num?)?.toDouble(),
+        sellerReceives: (json['seller_receives'] as num?)?.toDouble(),
       );
 }
 
