@@ -58,7 +58,11 @@ class Bmaglasspay extends \Opencart\System\Engine\Controller
                         'Order #' . $orderId,
                         (float) $order['total'],
                         $currency,
-                        'OpenCart order ' . $orderId
+                        'OpenCart order ' . $orderId,
+                        null,
+                        null,
+                        // "Return to store" on the hosted pay page after payment.
+                        $this->url->link('checkout/success')
                     );
                     $this->db->query('INSERT INTO `' . DB_PREFIX . 'bmaglasspay_orders` SET `order_id` = ' . $orderId
                         . ', `link_code` = \'' . $this->db->escape($link['link_code']) . '\', `paid` = 0');

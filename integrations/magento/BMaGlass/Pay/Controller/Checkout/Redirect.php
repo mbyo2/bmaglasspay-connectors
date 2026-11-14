@@ -65,7 +65,11 @@ class Redirect extends Action
                 'Order #' . $order->getIncrementId(),
                 (float) $order->getGrandTotal(),
                 $currency,
-                'Magento order ' . $order->getIncrementId()
+                'Magento order ' . $order->getIncrementId(),
+                null,
+                null,
+                // "Return to store" on the hosted pay page after payment.
+                $this->_url->getUrl('checkout/onepage/success')
             );
             $payment->setAdditionalInformation('bmaglass_link_code', $link['link_code']);
             $payment->setAdditionalInformation('bmaglass_url', Client::paymentLinkUrl($link['link_code']));

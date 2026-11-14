@@ -241,16 +241,31 @@ if (!class_exists('BMaGlassClient')) {
         }
 
         /**
-         * POST /payment-links — create a hosted payment link (live keys
-         * only). Returns the row including link_code; the buyer-facing
+         * POST /payment-links — create a hosted payment link in the
+         * key's environment (sandbox links settle only by simulation).
+         * Returns the row including link_code; the buyer-facing
          * URL is self::paymentLinkUrl($row['link_code']).
+         * $feePayer ('seller'|'buyer') overrides the merchant default
+         * from settings() for this link only: 'seller' — the fee comes
+         * out of what the seller receives; 'buyer' — the fee is added on
+         * top and the seller receives the full price. $redirectUrl is the
+         * buyer return URL the hosted pay page offers after payment.
+         * The returned row carries the resolved fee_payer plus
+         * fee_amount / buyer_total / seller_receives.
          */
-        public function createPaymentLink($title, $amount = null, $currency = 'ZMW', $description = null, $expiresAt = null)
+        public function createPaymentLink($title, $amount = null, $currency = 'ZMW', $description = null, $expiresAt = null, $feePayer = null, $redirectUrl = null)
         {
             $body = array('title' => (string) $title, 'currency' => self::assertSupportedCurrency($currency));
             if ($amount !== null) $body['amount'] = round((float) $amount, 2);
             if ($description !== null) $body['description'] = $description;
             if ($expiresAt !== null) $body['expires_at'] = $expiresAt;
+            if ($feePayer !== null) {
+                if ($feePayer !== 'seller' && $feePayer !== 'buyer') {
+                    throw new BMaGlassApiException(0, 'invalid_fee_payer', "fee_payer must be 'seller' or 'buyer'.");
+                }
+                $body['fee_payer'] = $feePayer;
+            }
+            if ($redirectUrl !== null) $body['redirect_url'] = (string) $redirectUrl;
             return $this->request('POST', 'payment-links', $body);
         }
 

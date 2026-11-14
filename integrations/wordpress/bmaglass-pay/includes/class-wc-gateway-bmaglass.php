@@ -71,8 +71,9 @@ class WC_Gateway_BMaGlass extends WC_Payment_Gateway
             'api_key' => array(
                 'title' => 'API key',
                 'type' => 'password',
-                'description' => 'Create a key in BMaGlass Pay (Business settings or the API page) with the payment_links '
-                    . 'and wallets scopes. A production key (bmg_live_...) is required to take payments. A sandbox key '
+                'description' => 'Create a key in BMaGlass Pay (Business settings or the API page) with the payment_links:write, '
+                    . 'wallets:read and webhooks:write scopes (webhooks:write is what lets this plugin register its webhook). '
+                    . 'A production key (bmg_live_...) is required to take payments. A sandbox key '
                     . '(bmg_sandbox_...) runs the integration with simulated money — it can never move real money. '
                     . 'Older bmp_ keys keep working. The plugin configures itself from the key: paste it, test the '
                     . 'connection, and your environment and available features are read from your BMaGlass account.',
@@ -206,7 +207,10 @@ class WC_Gateway_BMaGlass extends WC_Payment_Gateway
                 $total,
                 $currency,
                 sprintf('WooCommerce order %s', $order->get_order_key()),
-                gmdate('c', time() + 7 * DAY_IN_SECONDS)
+                gmdate('c', time() + 7 * DAY_IN_SECONDS),
+                null,
+                // "Return to store" on the hosted pay page after payment.
+                $this->get_return_url($order)
             );
         } catch (BMaGlassApiException $e) {
             wc_add_notice($e->userMessage(), 'error');

@@ -44,11 +44,18 @@ class BmaglasspayRedirectModuleFrontController extends ModuleFrontController
         }
         $order = new Order((int) $orderId);
         try {
+            // "Return to store" on the hosted pay page after payment.
+            $returnUrl = $this->context->link->getPageLink('order-confirmation', true, null,
+                'id_cart=' . (int) $cart->id . '&id_module=' . (int) $this->module->id
+                . '&id_order=' . (int) $orderId . '&key=' . $customer->secure_key);
             $link = $this->module->client()->createPaymentLink(
                 'Order #' . $order->reference,
                 (float) $order->total_paid,
                 $currencyCode,
-                'PrestaShop order ' . $order->reference
+                'PrestaShop order ' . $order->reference,
+                null,
+                null,
+                $returnUrl
             );
             $this->module->recordLink((int) $orderId, $link['link_code']);
             Tools::redirect(Client::paymentLinkUrl($link['link_code']));
