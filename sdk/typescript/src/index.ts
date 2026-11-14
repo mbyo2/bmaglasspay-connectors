@@ -28,7 +28,7 @@ export interface PaymentLink { id: string; title: string; description: string | 
 export interface WebhookEndpoint { id: string; url: string; events: string[]; is_active: boolean; created_at: string; secret?: string }
 export interface WebhookDelivery { id: string; webhook_id: string | null; event_id: string; event_type: string; webhook_url: string; status: string; attempts: number; response_status: number | null; error_message: string | null; created_at: string }
 export interface BitcoinQuote { id: string; side: "buy" | "sell"; amount_zmw: number; amount_sats: number; fee_bps: number; fee_zmw: number; mid_rate_zmw: number; expires_at: string; created_at: string }
-export interface AccountSettings { fee_payer_default: "seller" | "buyer"; platform_fee_percent: number | null; paypal_platform_fee_percent: number | null; note: string }
+export interface AccountSettings { fee_payer_default: "seller" | "buyer"; platform_fee_percent: number | null; paypal_platform_fee_percent: number | null; /** The merchant's mobile-money fee-bearer choice (who funds the 1% momo service charge). */ momo_fee_bearer: "seller" | "buyer"; note: string }
 export interface FeatureState { status: "enabled" | "disabled" | "not_entitled" | "pending_verification"; reason_code: string | null }
 export interface ConnectorConfig {
   environment: "sandbox" | "production"; livemode: boolean; config_version: string;
@@ -39,7 +39,7 @@ export interface ConnectorConfig {
 }
 export interface Invoice { id: string; amount: number; currency: string; description: string | null; customer_email: string | null; status: "open" | "paid" | "expired" | "cancelled"; environment: "sandbox" | "production"; livemode: boolean; metadata: Record<string, unknown>; paid_at: string | null; created_at: string }
 export interface PaymentLinkAttempt { id: string; fiat_amount: number | null; fiat_currency: string; fee_payer: string; fee_percent: number | null; fee_sats: number | null; amount_sats: number | null; required_sats: number | null; seen_sats: number | null; received_sats: number | null; status: string; onchain_address: string | null; lightning_invoice: string | null; expires_at: string | null; settled_at: string | null; created_at: string }
-export interface MobileMoneyCollection { reference: string; merchant_reference: string | null; collection_id: string; transaction_id: string | null; amount: number; currency: string; operator: "mtn" | "airtel" | "zamtel"; phone: string; status: "pending" | "successful" | "failed"; failure_reason: string | null; environment: "sandbox" | "production"; livemode: boolean; wallet_balance: number | null; settled_at: string | null; created_at: string }
+export interface MobileMoneyCollection { reference: string; merchant_reference: string | null; collection_id: string; transaction_id: string | null; amount: number; /** The product amount the 1% service charge is computed on (== amount in seller mode). */ base_amount: number; /** The 1% service charge on base_amount. */ service_charge: number; /** Who funds the service charge, derived from the settled row. */ fee_bearer: "seller" | "buyer"; currency: string; operator: "mtn" | "airtel" | "zamtel"; phone: string; status: "pending" | "successful" | "failed"; failure_reason: string | null; environment: "sandbox" | "production"; livemode: boolean; wallet_balance: number | null; settled_at: string | null; created_at: string }
 
 export interface BMaGlassOptions {
   apiKey: string;
