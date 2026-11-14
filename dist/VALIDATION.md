@@ -8,7 +8,7 @@ Release version: **1.0.0**. Validated against the UNZIPPED zip contents (not the
 - OK bmaglasspay-automation-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-automation-1.0.0.zip: no bytecode
 - OK bmaglasspay-automation-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-automation-1.0.0.zip: 7087 bytes, sha256 `f00abf1be1b61fa6412d86d947fea9f8c0f148735beb688db134f81232fffe3a`, 8 files
+  - bmaglasspay-automation-1.0.0.zip: 8455 bytes, sha256 `c65ba8276256acb7302dc0d2af97abc98bb12e8640cee7bb7b19c0adf9c587a1`, 11 files
 - OK bmaglasspay-embed-button-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-embed-button-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-embed-button-1.0.0.zip: no bytecode
@@ -18,7 +18,7 @@ Release version: **1.0.0**. Validated against the UNZIPPED zip contents (not the
 - OK bmaglasspay-magento-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-magento-1.0.0.zip: no bytecode
 - OK bmaglasspay-magento-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-magento-1.0.0.zip: 17666 bytes, sha256 `969ff71309d4407dcf0e4d316fff6cd78457f3136d5aaa29c2b074eab5c92d63`, 16 files
+  - bmaglasspay-magento-1.0.0.zip: 17721 bytes, sha256 `757dba6397448f4e7cf6a305e5383e3eb92b71562526fefe9d99af119cb46a50`, 16 files
 - OK bmaglasspay-odoo-16.0-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-odoo-16.0-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-odoo-16.0-1.0.0.zip: no bytecode
@@ -48,37 +48,37 @@ Release version: **1.0.0**. Validated against the UNZIPPED zip contents (not the
 - OK bmaglasspay-opencart-3-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-opencart-3-1.0.0.zip: no bytecode
 - OK bmaglasspay-opencart-3-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-opencart-3-1.0.0.zip: 15388 bytes, sha256 `8bb1694ee99e9edd1e5cafdcf78abe793e3a48ae5d24b352368105adb5004452`, 11 files
+  - bmaglasspay-opencart-3-1.0.0.zip: 15442 bytes, sha256 `03f0f73b48cab04de040beafdae815db422602952fcaa978f6114ff621f73aa5`, 11 files
 - OK bmaglasspay-opencart-4-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-opencart-4-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-opencart-4-1.0.0.zip: no bytecode
 - OK bmaglasspay-opencart-4-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-opencart-4-1.0.0.zip: 14621 bytes, sha256 `9f08e44a27601b16c85ddbf89fdfd9e22b460aba84e8db45fea9784c46fc762d`, 10 files
+  - bmaglasspay-opencart-4-1.0.0.zip: 14675 bytes, sha256 `85805582f51116a8439807eb89f8e627f8f295f5b484cc347101b2aea0f5945b`, 10 files
 - OK bmaglasspay-prestashop-1.7-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-prestashop-1.7-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-prestashop-1.7-1.0.0.zip: no bytecode
 - OK bmaglasspay-prestashop-1.7-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-prestashop-1.7-1.0.0.zip: 13537 bytes, sha256 `a924ec5daf6a62195140cac04f4aea37b6039a408c74596fdf50307e7e09df84`, 8 files
+  - bmaglasspay-prestashop-1.7-1.0.0.zip: 13591 bytes, sha256 `942a6cae2d717756d63c6aac53c1bc372c0b01bf6f1265ab40cdeb0580c9b004`, 8 files
 - OK bmaglasspay-prestashop-8-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-prestashop-8-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-prestashop-8-1.0.0.zip: no bytecode
 - OK bmaglasspay-prestashop-8-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-prestashop-8-1.0.0.zip: 13507 bytes, sha256 `4d62cfd2b772cd4b163f889e42302016e39921374e82618366ff0fc648e42f2f`, 8 files
+  - bmaglasspay-prestashop-8-1.0.0.zip: 13561 bytes, sha256 `a729586b36a12e8cf42f2e1137c1cbe28740a69a710befd049b63a1a218f87ba`, 8 files
 - OK bmaglasspay-prestashop-9-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-prestashop-9-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-prestashop-9-1.0.0.zip: no bytecode
 - OK bmaglasspay-prestashop-9-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-prestashop-9-1.0.0.zip: 13862 bytes, sha256 `e902270c02b9e275ffbb1a6fc0be09fe7bbab1635ee016119221c45b4c7a381d`, 9 files
+  - bmaglasspay-prestashop-9-1.0.0.zip: 13916 bytes, sha256 `c2158d365891dec8d89af353995f087375c3b51c2dc756cde67f1339971c9603`, 9 files
 - OK bmaglasspay-sdk-flutter-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-sdk-flutter-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-flutter-1.0.0.zip: no bytecode
 - OK bmaglasspay-sdk-flutter-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-sdk-flutter-1.0.0.zip: 12208 bytes, sha256 `78c1add46eb30142a35f5b73b89bd6e32f01cd48245c55b81e2492100d114adc`, 9 files
+  - bmaglasspay-sdk-flutter-1.0.0.zip: 12263 bytes, sha256 `6711c4b90df2a4028a49df5a208b236ca161d042e1bd101c4531ce2c4c3ec0c2`, 9 files
 - OK bmaglasspay-sdk-php-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-sdk-php-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-php-1.0.0.zip: no bytecode
 - OK bmaglasspay-sdk-php-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-sdk-php-1.0.0.zip: 11900 bytes, sha256 `8ed2e59d1e0ca46c10937c4103f74a3020dfcbcc069d38a9d0411da50204c23a`, 6 files
+  - bmaglasspay-sdk-php-1.0.0.zip: 11994 bytes, sha256 `48819c6a34ecc1e27382bdf95c4addbc781e8c9df4f7aca1a775aed0e5261412`, 6 files
 - OK bmaglasspay-sdk-python-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-sdk-python-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-python-1.0.0.zip: no bytecode
@@ -88,17 +88,17 @@ Release version: **1.0.0**. Validated against the UNZIPPED zip contents (not the
 - OK bmaglasspay-sdk-react-native-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-react-native-1.0.0.zip: no bytecode
 - OK bmaglasspay-sdk-react-native-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-sdk-react-native-1.0.0.zip: 12216 bytes, sha256 `b9bb3bd3a8337b96f5aa57f89722501ae8573d6bdd47f46bd9d799de6cd56089`, 7 files
+  - bmaglasspay-sdk-react-native-1.0.0.zip: 12372 bytes, sha256 `c9b33fc91e510eb9d58816a3b3ab61b1825e5c41e7fc25c62f9aacd3420cc988`, 7 files
 - OK bmaglasspay-sdk-typescript-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-sdk-typescript-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-typescript-1.0.0.zip: no bytecode
 - OK bmaglasspay-sdk-typescript-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-sdk-typescript-1.0.0.zip: 14078 bytes, sha256 `c48cb19e5ef40265808c0844b0f11b1b79b243ac85dff0507b0ae4c753a8029d`, 8 files
+  - bmaglasspay-sdk-typescript-1.0.0.zip: 14461 bytes, sha256 `6a9597f20aa114c003cca069dd116ae0a8d185f3b4f57208c4b30b90be067f8e`, 8 files
 - OK bmaglasspay-woocommerce-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-woocommerce-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-woocommerce-1.0.0.zip: no bytecode
 - OK bmaglasspay-woocommerce-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-woocommerce-1.0.0.zip: 30379 bytes, sha256 `9805e610cdf9f18050aaf9ac8b3b7b0809a6cf22422ac5ea13af993da910c260`, 12 files
+  - bmaglasspay-woocommerce-1.0.0.zip: 31767 bytes, sha256 `4c6bef1c4c981c9184bf5dc44477cc88341f6457b43e90d873325bf9451d27ad`, 12 files
 ## Store modules — scripts/validate-store-zips.py
 
 Validator exit code: 0
@@ -522,6 +522,40 @@ PASS  momo failed collection fails the order with the reason
 
 ALL PASS
 ```
+- run-momo-gateway-tests.php: rc=0, 30 PASS / 0 FAIL (expected 30 PASS / 0 FAIL)
+```
+PASS  service charge on K100 is K1.00 (got 1.0)
+PASS  service charge on K10 is K0.10 (got 0.1)
+PASS  service charge on K99.99 is K1.00 (got 1.0)
+PASS  service charge on K0.05 is K0.00 (got 0.0)
+PASS  available when enabled + connected
+PASS  seller mode by default
+PASS  seller buyer-total equals the product amount (got 100.0)
+PASS  buyer mode read from the config
+PASS  buyer total is product + 1% (K100 -> K101.00) (got 101.0)
+PASS  buyer total on K10 is K10.10 (got 10.1)
+PASS  unavailable when not connected
+PASS  unavailable when the feature is disabled
+PASS  missing fee_bearer defaults to seller
+PASS  buyer mode shows the true K101.00 total
+PASS  buyer mode shows the K100.00 product amount
+PASS  buyer mode shows the K1.00 service charge
+PASS  seller mode shows no service-charge line
+PASS  buyer checkout succeeds (got 'success')
+PASS  order parked on-hold while the buyer approves
+PASS  collection started with the PRODUCT amount (K100, not K101) (got 100)
+PASS  on-hold note quotes the charged K101.00, not the order total
+PASS  buyer notice quotes the charged K101.00
+PASS  cart emptied
+PASS  order reference stored (got 'BMG-T1')
+PASS  seller on-hold note quotes K100.00
+PASS  seller note does not quote K101.00
+PASS  synchronous settlement completes the order
+PASS  confirmed note quotes the charged K101.00
+PASS  blocks data carries fee_bearer buyer
+PASS  blocks data carries fee_bearer seller
+MoMo gateway fee-bearer <redacted> ALL PASS
+```
 - OK php -l clean on all 8 PHP files
 - OK node --check clean on all 2 JS files
 - OK unzipped tree byte-identical to repo plugin folder
@@ -652,7 +686,7 @@ ALL EMBED TESTS PASSED
 ```
 ## Automation — JSON validity (unzipped zip)
 
-- OK all 5 JSON files parse
+- OK all 8 JSON files parse
 - OK automation zip contains README.md
 - OK automation zip contains INSTALL/README.md
 - OK automation zip contains zapier/triggers-and-creates.json
