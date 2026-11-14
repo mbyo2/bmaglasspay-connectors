@@ -322,7 +322,14 @@ def main() -> None:
     # --- Report --------------------------------------------------------------
     lines.append(f"\n**Zip validation overall: "
                  f"{'PASS' if overall_ok else 'FAIL'}**\n")
-    (dist / "VALIDATION.md").write_text("\n".join(lines))
+    report = "\n".join(lines)
+    # Normalise run-varying noise so the report is reproducible:
+    # unittest timings ("Ran 15 tests in 0.001s") and the random temp
+    # dir path of this run. Without this, re-running the validator
+    # dirties the tracked VALIDATION.md for no reason.
+    report = re.sub(r"Ran (\d+) tests? in [\d.]+s", r"Ran \1 tests", report)
+    report = report.replace(str(tmp), "<tmpdir>")
+    (dist / "VALIDATION.md").write_text(report)
     print("\n".join(lines))
     print(f"\nValidation report: {dist / 'VALIDATION.md'}")
     sys.exit(0 if overall_ok else 1)

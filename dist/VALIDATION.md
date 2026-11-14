@@ -123,7 +123,7 @@ PHP interpreter: `/usr/bin/php`
 - Files in zip: 17
 - OK Odoo client tests (unzipped code):
 ```
-Ran 15 tests in 0.001s
+Ran 15 tests
 
 OK
 ```
@@ -136,7 +136,7 @@ OK
 - Files in zip: 18
 - OK Odoo client tests (unzipped code):
 ```
-Ran 15 tests in 0.001s
+Ran 15 tests
 
 OK
 ```
@@ -149,7 +149,7 @@ OK
 - Files in zip: 18
 - OK Odoo client tests (unzipped code):
 ```
-Ran 15 tests in 0.001s
+Ran 15 tests
 
 OK
 ```
@@ -162,7 +162,7 @@ OK
 - Files in zip: 18
 - OK Odoo client tests (unzipped code):
 ```
-Ran 15 tests in 0.001s
+Ran 15 tests
 
 OK
 ```
@@ -175,7 +175,7 @@ OK
 - Files in zip: 18
 - OK Odoo client tests (unzipped code):
 ```
-Ran 15 tests in 0.001s
+Ran 15 tests
 
 OK
 ```
@@ -253,7 +253,7 @@ OK   namespaced integrations/magento/BMaGlass/Pay/Model/Api/ApiException.php (eq
 Repo-level checks are reported above for the record and do not change the zip verdict; see VALIDATION notes if one failed.
 
 
-Validation report: /tmp/validate-all-zips-kclkzndw/store-dist/VALIDATION.md
+Validation report: <tmpdir>/store-dist/VALIDATION.md
 ```
 <details><summary>Store validator report (dist/VALIDATION.md from the store run)</summary>
 
@@ -277,7 +277,7 @@ PHP interpreter: `/usr/bin/php`
 - Files in zip: 17
 - OK Odoo client tests (unzipped code):
 ```
-Ran 15 tests in 0.001s
+Ran 15 tests
 
 OK
 ```
@@ -290,7 +290,7 @@ OK
 - Files in zip: 18
 - OK Odoo client tests (unzipped code):
 ```
-Ran 15 tests in 0.001s
+Ran 15 tests
 
 OK
 ```
@@ -303,7 +303,7 @@ OK
 - Files in zip: 18
 - OK Odoo client tests (unzipped code):
 ```
-Ran 15 tests in 0.001s
+Ran 15 tests
 
 OK
 ```
@@ -316,7 +316,7 @@ OK
 - Files in zip: 18
 - OK Odoo client tests (unzipped code):
 ```
-Ran 15 tests in 0.001s
+Ran 15 tests
 
 OK
 ```
@@ -329,7 +329,7 @@ OK
 - Files in zip: 18
 - OK Odoo client tests (unzipped code):
 ```
-Ran 15 tests in 0.001s
+Ran 15 tests
 
 OK
 ```
@@ -532,7 +532,7 @@ test_wallets_sends_key_header (test_python_sdk.SdkContractTest.test_wallets_send
 test_known_answer_vector (test_python_sdk.WebhookVerifyTest.test_known_answer_vector) ... ok
 
 ----------------------------------------------------------------------
-Ran 8 tests in 0.001s
+Ran 8 tests
 
 OK
 ```
