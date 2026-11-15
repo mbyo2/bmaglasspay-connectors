@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -19,16 +20,22 @@ class BMaGlass {
   final String _baseUrl;
   final http.Client _http;
 
+  /// Per-request timeout (default 30s). A request that does not settle
+  /// in time fails as a BMaGlassException with code "network_error"
+  /// instead of hanging forever.
+  final Duration timeout;
+
   /// Legacy mode name, from the key alone — same rule as the other SDKs.
   final String mode;
 
   /// "production" or "sandbox", derived ONLY from the key.
   final String environment;
 
-  BMaGlass({required String apiKey, String? baseUrl, http.Client? httpClient})
+  BMaGlass({required String apiKey, String? baseUrl, http.Client? httpClient, Duration? timeout})
       : _apiKey = apiKey,
         _baseUrl = (baseUrl ?? defaultBase).replaceAll(RegExp(r'/$'), ''),
         _http = httpClient ?? http.Client(),
+        timeout = timeout ?? const Duration(seconds: 30),
         mode = apiKey.contains('_live_') ? 'live' : 'test',
         environment = apiKey.contains('_live_') ? 'production' : 'sandbox' {
     if (!apiKey.startsWith('bmg_') && !apiKey.startsWith('bmp_')) {
@@ -63,21 +70,26 @@ class BMaGlass {
     };
     http.Response res;
     try {
+      final Future<http.Response> call;
       switch (method) {
         case 'GET':
-          res = await _http.get(uri, headers: allHeaders);
+          call = _http.get(uri, headers: allHeaders);
           break;
         case 'DELETE':
-          res = await _http.delete(uri, headers: allHeaders);
+          call = _http.delete(uri, headers: allHeaders);
           break;
         case 'POST':
-          res = await _http.post(uri, headers: allHeaders, body: body == null ? null : jsonEncode(body));
+          call = _http.post(uri, headers: allHeaders, body: body == null ? null : jsonEncode(body));
           break;
         default:
           throw BMaGlassException(0, 'request_failed', 'Unsupported method $method');
       }
+      res = await call.timeout(timeout);
     } on BMaGlassException {
       rethrow;
+    } on TimeoutException {
+      throw BMaGlassException(0, 'network_error',
+          "BMaGlass Pay did not answer within ${timeout.inMilliseconds}ms. Check the connection and try again.");
     } catch (e) {
       throw BMaGlassException(0, 'network_error', "Couldn't reach BMaGlass Pay. Check the connection and try again. ($e)");
     }
@@ -114,19 +126,28 @@ class BMaGlass {
     return data.map((e) => e as Map<String, dynamic>).toList();
   }
 
+  /// GET /invoices/{id} (404 across environments, by design).
+  Future<Map<String, dynamic>> getInvoice(String invoiceId) async {
+    return await _request('GET', 'invoices/${Uri.encodeComponent(invoiceId)}') as Map<String, dynamic>;
+  }
+
   /// POST /invoices — create an invoice in the key's environment.
+  /// Invoices are NOT currency-guarded: the API accepts any 3-letter
+  /// invoice currency (a payment request, not a wallet move).
   Future<Map<String, dynamic>> createInvoice({
     required num amount,
     String currency = 'ZMW',
     String? description,
     String? customerEmail,
+    Map<String, dynamic>? metadata,
   }) async {
     final body = <String, dynamic>{
       'amount': amount,
-      'currency': assertSupportedCurrency(currency),
+      'currency': currency,
     };
     if (description != null) body['description'] = description;
     if (customerEmail != null) body['customer_email'] = customerEmail;
+    if (metadata != null) body['metadata'] = metadata;
     return await _request('POST', 'invoices', body: body) as Map<String, dynamic>;
   }
 
@@ -191,7 +212,7 @@ class BMaGlass {
   /// return URL the hosted pay page offers after payment.
   Future<PaymentLink> createPaymentLink({
     required String title,
-    double? amount,
+    num? amount,
     String currency = 'ZMW',
     String? description,
     String? expiresAt,
@@ -236,12 +257,14 @@ class BMaGlass {
     required String phone,
     String? operator,
     String? reference,
+    String? idempotencyKey,
   }) async {
     final body = <String, dynamic>{
       'amount': amount,
       'phone': phone,
       if (operator != null) 'operator': operator,
       if (reference != null) 'reference': reference,
+      if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
     };
     return await _request('POST', 'mobile-money/collections', body: body) as Map<String, dynamic>;
   }
@@ -282,9 +305,14 @@ class BMaGlass {
   }
 
   /// POST /bitcoin/quote — quote only; execution stays in the app.
+  /// [side] must be "buy" or "sell": a typo here used to be silently
+  /// treated as a buy quote, which flips the money direction.
   Future<Map<String, dynamic>> bitcoinQuote({required String side, num? amountZmw, num? amountSats}) async {
+    if (side != 'buy' && side != 'sell') {
+      throw const BMaGlassException(0, 'invalid_side', "side must be 'buy' or 'sell'.");
+    }
     final body = <String, dynamic>{
-      'side': side == 'sell' ? 'sell' : 'buy',
+      'side': side,
       if (amountZmw != null) 'amount_zmw': amountZmw,
       if (amountSats != null) 'amount_sats': amountSats,
     };

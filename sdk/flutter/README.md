@@ -44,17 +44,22 @@ final event = parseWebhookEvent(rawBody, signatureHeader, webhookSecret);
 - **Sandbox keys use simulated money**: reads work, sandbox invoices
   and payment links can be created and settled via simulation; real-money
   writes throw `test_mode_read_only` with a plain-language message.
-- **Currencies:** ZMW and USD only; anything else throws
-  `unsupported_currency` — no FX rate is ever invented.
+- **Currencies:** transfers and payment links are ZMW and USD only
+  (the currencies BMaGlass wallets hold); anything else throws
+  `unsupported_currency` — no FX rate is ever invented. Invoices are
+  not guarded: the API accepts any 3-letter invoice currency (a
+  payment request, not a wallet move).
 - **API keys are secrets.** A production key (`bmg_live_`, legacy `bmp_live_`) moves real money. In a
   consumer app, prefer your own backend holding the key server-side;
   embed a key only for the key owner's own account use.
 
 ## Verification status
 
-**Verified 2026-10-27** on Dart SDK 3.13.7 (stable, linux x64 — the
-Dart version bundled with Flutter 3.47.8): `dart analyze` reports no
-issues and `dart test` passes **10/10**. This is a pure-Dart package
+**Verified 2026-11-15** on Dart SDK 3.14.0 (stable, linux x64 — cached
+at `~/.cache/bmaglass-dart-sdk/dart-sdk` on this VM): `dart analyze`
+reports no issues and `dart test` passes **17/17**. The earlier
+"unrunnable here" note was wrong — the cached Dart toolchain runs the
+whole suite; no Flutter SDK install is needed. This is a pure-Dart package
 (no Flutter SDK dependency in `pubspec.yaml`), so the Dart toolchain
 alone runs the whole suite. The tests in `test/bmaglass_sdk_test.dart` use
 `package:http`'s MockClient (no network) and the same shared
