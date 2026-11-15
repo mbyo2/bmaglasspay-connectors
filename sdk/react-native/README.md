@@ -40,8 +40,11 @@ try {
   creation + simulation work (webhook registration works too —
   sandbox endpoints receive sandbox events); real-money
   writes throw `test_mode_read_only`.
-- **Currencies:** ZMW and USD only; anything else throws
+- **Currencies:** transfers and payment links are ZMW and USD only
+  (the currencies BMaGlass wallets hold); anything else throws
   `unsupported_currency` client-side — no FX rate is ever invented.
+  Invoices are not guarded: the API accepts any 3-letter invoice
+  currency (a payment request, not a wallet move).
 - **API keys are secrets.** A production key (`bmg_live_`, legacy `bmp_live_`) moves real money. In a
   consumer app, prefer calling your own backend with the key held
   server-side; ship a key in an app binary only for the key owner's
@@ -53,6 +56,7 @@ try {
 node sdk/react-native/test/run-tests.mjs
 ```
 
-(Node ≥ 22 runs the TypeScript sources via type stripping; 18 checks:
+(Node ≥ 22 runs the TypeScript sources via type stripping; 36 checks:
 SHA-256/HMAC vs `node:crypto`, shared webhook KAT, stub-fetch client
-behaviour, currency + test-mode guards.)
+behaviour, currency + test-mode guards, transport timeouts and id
+encoding.)
