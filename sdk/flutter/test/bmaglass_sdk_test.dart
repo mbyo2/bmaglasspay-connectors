@@ -39,6 +39,28 @@ http.Client stubClient() {
           }),
           200);
     }
+    if (req.url.path.endsWith('/payment-links/link1')) {
+      return http.Response(
+          jsonEncode({
+            'data': {
+              'id': 'pl1',
+              'title': 'Order #8',
+              'amount': 10,
+              'currency': 'ZMW',
+              'link_code': 'ABC123',
+              'status': 'active',
+              'fee_payer': 'seller',
+              'fee_amount': 0.25,
+              'buyer_total': 10,
+              'seller_receives': 9.75,
+              'payment_count': 0,
+              'total_collected': 0,
+              'created_at': 't'
+            },
+            'mode': 'test'
+          }),
+          200);
+    }
     if (req.url.path.endsWith('/wallets')) {
       return http.Response(
           jsonEncode({
@@ -235,6 +257,13 @@ void main() {
       final inv = await client.getInvoice('inv1');
       expect(inv['status'], 'open');
       expect(inv['amount'], 250);
+    });
+
+    test('getPaymentLink reads one link by code', () async {
+      final client = BMaGlass(apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', httpClient: stubClient());
+      final link = await client.getPaymentLink('link1');
+      expect(link.linkCode, 'ABC123');
+      expect(link.paymentCount, 0);
     });
 
     test('payment link create accepts int amounts', () async {

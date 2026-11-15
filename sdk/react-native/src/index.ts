@@ -179,6 +179,8 @@ export class BMaGlass {
   };
   paymentLinks = {
     list: () => this.request<PaymentLink[]>("GET", "payment-links"),
+    /** One link by UUID id or link_code. The list caps at 100 (newest first); this read is how a shop reconciler verifies an older link. */
+    get: (id: string) => this.request<PaymentLink>("GET", `payment-links/${encodeURIComponent(id)}`),
     /** Creates a link in the key's environment; sandbox links settle only by simulation. `fee_payer` overrides the merchant default from GET /settings for this link only ("seller" — the fee comes out of what the seller receives; "buyer" — the fee is added on top and the seller receives the full price). `redirect_url` is the buyer return URL the hosted pay page offers after payment. */
     create: (input: { title: string; description?: string; amount?: number; currency?: string; expires_at?: string; fee_payer?: "seller" | "buyer"; redirect_url?: string }) => {
       if (input.fee_payer !== undefined && input.fee_payer !== "seller" && input.fee_payer !== "buyer") {

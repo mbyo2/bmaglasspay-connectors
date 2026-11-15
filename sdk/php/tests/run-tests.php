@@ -77,6 +77,9 @@ $transport = function ($method, $url, $headers, $body) use (&$calls) {
     if (str_ends_with($url, '/payment-links/link1/attempts')) {
         return array(200, json_encode(array('data' => array(array('id' => 'att1', 'status' => 'waiting')), 'mode' => 'test')));
     }
+    if (str_ends_with($url, '/payment-links/link1')) {
+        return array(200, json_encode(array('data' => array('id' => 'pl1', 'title' => 'Order #8', 'amount' => 10, 'currency' => 'ZMW', 'link_code' => 'ABC123', 'status' => 'active', 'fee_payer' => 'seller', 'fee_amount' => 0.25, 'buyer_total' => 10, 'seller_receives' => 9.75, 'payment_count' => 0, 'total_collected' => 0), 'mode' => 'test')));
+    }
     if (str_ends_with($url, '/mobile-money/collections') && $method === 'POST') {
         $req = json_decode($body, true);
         return array(201, json_encode(array('data' => array('reference' => 'BMG-C1', 'merchant_reference' => $req['reference'] ?? null, 'amount' => $req['amount'], 'base_amount' => $req['amount'], 'service_charge' => round(($req['amount'] ?? 0) * 0.01, 2), 'fee_bearer' => 'seller', 'status' => 'pending'), 'mode' => 'test')));
@@ -142,6 +145,12 @@ eq('default link seller_receives', $sellerLink['seller_receives'], 9.75);
 $last = end($calls);
 $sent = json_decode($last['body'], true);
 eq('fee_payer sent', $sent['fee_payer'] ?? 'seller', 'seller');
+
+// One-link read (GET /payment-links/{id}) — the reconciler's escape
+// from the 100-link list cap.
+$one = $test->getPaymentLink('link1');
+eq('get one link code', $one['link_code'], 'ABC123');
+eq('get one link count', $one['payment_count'], 0);
 
 try {
     $test->createPaymentLink('Bad', 10, 'ZMW', null, null, 'nobody');

@@ -36,6 +36,7 @@ const server = createServer((req, res) => {
     if (req.url === "/bitcoin/balance") return reply(200, { data: [{ asset: "BTC", balance_sats: 1000, available_sats: 1000, updated_at: "z" }], mode: "test" });
     if (req.url === "/webhooks" && req.method === "POST") return reply(201, { data: { id: "wh1", url: "https://example.com/hook", events: ["webhook.test"], is_active: true, created_at: "t", secret: "whsec_testsecret" }, mode: "test" });
     if (req.url === "/settings") return reply(200, { data: { fee_payer_default: "seller", platform_fee_percent: 2.5, paypal_platform_fee_percent: 1, momo_fee_bearer: "seller", note: "n" }, mode: "test" });
+    if (req.url === "/payment-links/link1") return reply(200, { data: { id: "pl1", title: "Order #8", amount: 10, currency: "ZMW", link_code: "ABC123", status: "active", fee_payer: "seller", fee_amount: 0.25, buyer_total: 10, seller_receives: 9.75, payment_count: 0, total_collected: 0, created_at: "t" }, mode: "test" });
     if (req.url === "/payment-links/link1/attempts") return reply(200, { data: [{ id: "att1", status: "waiting" }], mode: "test" });
     if (req.url === "/mobile-money/collections" && req.method === "POST") { const b = JSON.parse(body || "{}"); return reply(201, { data: { reference: "BMG-C1", merchant_reference: b.reference ?? null, collection_id: "col1", transaction_id: null, amount: b.amount, base_amount: b.amount, service_charge: Math.round((b.amount ?? 0) * 0.01 * 100) / 100, fee_bearer: "seller", currency: "ZMW", operator: b.operator ?? "mtn", phone: b.phone, status: "pending", failure_reason: null, environment: "sandbox", livemode: false, wallet_balance: null, settled_at: null, created_at: "t" }, mode: "test" }); }
     if (req.url === "/mobile-money/collections/BMG-C1" && req.method === "GET") return reply(200, { data: { reference: "BMG-C1", merchant_reference: "order-42", collection_id: "col1", transaction_id: "tx1", amount: 100, base_amount: 100, service_charge: 1, fee_bearer: "seller", currency: "ZMW", operator: "mtn", phone: "0961111111", status: "successful", failure_reason: null, environment: "sandbox", livemode: false, wallet_balance: 99, settled_at: "t", created_at: "t" }, mode: "test" });
@@ -96,6 +97,7 @@ assert.equal(settings.paypal_platform_fee_percent, 1);
 // Live GET /settings also returns the momo fee-bearer (gate14-api-webhook-a1).
 assert.equal(settings.momo_fee_bearer, "seller");
 assert.equal((await client.paymentLinks.attempts("link1"))[0].status, "waiting");
+assert.equal((await client.paymentLinks.get("link1")).link_code, "ABC123");
 
 const coll = await client.mobileMoney.createCollection({ amount: 100, phone: "0961111111", reference: "order-42" });
 assert.equal(coll.status, "pending");

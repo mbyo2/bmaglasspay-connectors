@@ -57,6 +57,8 @@ class FakeSession:
             return FakeResponse(200, {"data": {"fee_payer_default": "seller", "platform_fee_percent": 2.5, "paypal_platform_fee_percent": 1, "note": "n"}, "mode": "test"})
         if url.endswith("/payment-links/link1/attempts"):
             return FakeResponse(200, {"data": [{"id": "att1", "status": "waiting"}], "mode": "test"})
+        if url.endswith("/payment-links/link1"):
+            return FakeResponse(200, {"data": {"id": "pl1", "title": "Order #8", "amount": 10, "currency": "ZMW", "link_code": "ABC123", "status": "active", "fee_payer": "seller", "payment_count": 0, "total_collected": 0}, "mode": "test"})
         if url.endswith("/payment-links") and method == "POST":
             # Sandbox keys CAN create payment links (settlement is simulation-only);
             # only transfers/webhook registration are live-only. The stub echoes
@@ -165,6 +167,7 @@ class SdkContractTest(unittest.TestCase):
         self.assertEqual(settings["platform_fee_percent"], 2.5)
         self.assertEqual(settings["paypal_platform_fee_percent"], 1)
         self.assertEqual(self.client.payment_links.attempts("link1")[0]["status"], "waiting")
+        self.assertEqual(self.client.payment_links.get("link1")["link_code"], "ABC123")
 
 
 class ExtHuntFixesTest(unittest.TestCase):

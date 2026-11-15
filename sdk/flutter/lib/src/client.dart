@@ -203,6 +203,14 @@ class BMaGlass {
     return data.map((e) => PaymentLink.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  /// GET /payment-links/{id} — one link by UUID id or link_code. The
+  /// list caps at 100 (newest first); this read is how a shop
+  /// reconciler verifies an older link.
+  Future<PaymentLink> getPaymentLink(String idOrCode) async {
+    final data = await _request('GET', 'payment-links/${Uri.encodeComponent(idOrCode)}') as Map<String, dynamic>;
+    return PaymentLink.fromJson(data);
+  }
+
   /// POST /payment-links — create a hosted payment link (sandbox keys
   /// create links too; only settlement is simulation-only).
   /// [feePayer] ("seller" | "buyer") overrides the merchant default

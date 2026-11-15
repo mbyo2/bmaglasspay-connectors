@@ -160,14 +160,28 @@ class Bmaglasspay extends \Opencart\System\Engine\Controller
         if (!$rows) {
             return 0;
         }
-        try {
-            $links = $this->apiClient()->listPaymentLinks();
-        } catch (ApiException $e) {
-            return 0;
-        }
         $counts = [];
-        foreach ((array) $links as $link) {
-            $counts[(string) $link['link_code']] = (int) $link['payment_count'];
+        if ($linkCode !== null) {
+            // Webhook path: read this one link directly — the list
+            // caps at 100 (newest first), so an older link is
+            // unverifiable from the list alone.
+            try {
+                $link = $this->apiClient()->getPaymentLink($linkCode);
+            } catch (ApiException $e) {
+                return 0;
+            }
+            if (is_array($link) && isset($link['link_code'])) {
+                $counts[(string) $link['link_code']] = (int) $link['payment_count'];
+            }
+        } else {
+            try {
+                $links = $this->apiClient()->listPaymentLinks();
+            } catch (ApiException $e) {
+                return 0;
+            }
+            foreach ((array) $links as $link) {
+                $counts[(string) $link['link_code']] = (int) $link['payment_count'];
+            }
         }
         $this->load->model('checkout/order');
         $completed = 0;

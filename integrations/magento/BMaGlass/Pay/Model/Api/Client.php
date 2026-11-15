@@ -122,12 +122,16 @@ class Client
         return $this->request('GET', 'invoices/' . rawurlencode((string) $invoiceId));
     }
 
-    /** POST /invoices — create an invoice in the key's environment. */
-    public function createInvoice($amount, $currency = 'ZMW', $description = null, $customerEmail = null)
+    /** POST /invoices — create an invoice in the key's environment.
+     *  Invoices are NOT currency-guarded: the API accepts any 3-letter
+     *  invoice currency (a payment request, not a wallet move), so
+     *  refusing EUR/GBP here would block valid API calls. */
+    public function createInvoice($amount, $currency = 'ZMW', $description = null, $customerEmail = null, $metadata = null)
     {
-        $body = array('amount' => $amount, 'currency' => self::assertSupportedCurrency($currency));
+        $body = array('amount' => $amount, 'currency' => $currency);
         if ($description !== null) $body['description'] = $description;
         if ($customerEmail !== null) $body['customer_email'] = $customerEmail;
+        if ($metadata !== null) $body['metadata'] = $metadata;
         return $this->request('POST', 'invoices', $body);
     }
 
@@ -187,6 +191,17 @@ class Client
     }
 
     /**
+     * GET /payment-links/{id} — one link by UUID id or link_code.
+     * The list endpoint caps at 100 (newest first); this read is how
+     * a shop reconciler verifies an older link. Throws on 404 when
+     * the link does not belong to this key's owner/environment.
+     */
+    public function getPaymentLink($idOrCode)
+    {
+        return $this->request('GET', 'payment-links/' . rawurlencode((string) $idOrCode));
+    }
+
+    /**
      * POST /payment-links — create a hosted payment link in the
      * key's environment (sandbox links settle only by simulation).
      * Returns the row including link_code; the buyer-facing
@@ -236,11 +251,12 @@ class Client
      * business_not_set_up / not_configured, 403 not_entitled /
      * business_inactive. Requires the mobile_money:create scope.
      */
-    public function createMobileMoneyCollection($amount, $phone, $operator = null, $reference = null)
+    public function createMobileMoneyCollection($amount, $phone, $operator = null, $reference = null, $idempotencyKey = null)
     {
         $body = array('amount' => round((float) $amount, 2), 'phone' => (string) $phone);
         if ($operator !== null) $body['operator'] = $operator;
         if ($reference !== null) $body['reference'] = $reference;
+        if ($idempotencyKey !== null) $body['idempotency_key'] = $idempotencyKey;
         return $this->request('POST', 'mobile-money/collections', $body);
     }
 
@@ -284,10 +300,15 @@ class Client
         return $this->request('GET', 'bitcoin/deposit-address');
     }
 
-    /** POST /bitcoin/quote — quote only; execution stays in the app. */
+    /** POST /bitcoin/quote — quote only; execution stays in the app.
+     *  `side` must be "buy" or "sell": a typo here used to be silently
+     *  treated as a buy quote, which flips the money direction. */
     public function bitcoinQuote($side, $amountZmw = null, $amountSats = null)
     {
-        $body = array('side' => $side === 'sell' ? 'sell' : 'buy');
+        if ($side !== 'buy' && $side !== 'sell') {
+            throw new ApiException(0, 'invalid_side', "side must be 'buy' or 'sell'.");
+        }
+        $body = array('side' => $side);
         if ($amountZmw !== null) $body['amount_zmw'] = $amountZmw;
         if ($amountSats !== null) $body['amount_sats'] = $amountSats;
         return $this->request('POST', 'bitcoin/quote', $body);

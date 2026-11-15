@@ -111,14 +111,24 @@ def main() -> None:
                 lines.append("- OK no __pycache__ / *.pyc")
             out = tmp / zpath.stem
             zf.extractall(out)
-        missing = [e for e in EXPECTED[k] if not (out / e).exists()]
-        if name.startswith("bmaglasspay-opencart-3-") and not (out / "install.json").exists():
+        # OC4 ships the vendored client under the extension folder
+        # (B10 fix: the installer rejects the OC3 layout on 4.x), so
+        # its expected paths differ from OC3's.
+        expected = EXPECTED[k]
+        if name.startswith("bmaglasspay-opencart-4-"):
+            expected = [
+                "upload/extension/bmaglasspay/system/library/bmaglass/Client.php",
+                "upload/extension/bmaglasspay/system/library/bmaglass/ApiException.php",
+                "INSTALL/README.md",
+            ]
+        missing = [e for e in expected if not (out / e).exists()]
+        if name.startswith("bmaglasspay-opencart-") and not (out / "install.json").exists():
             missing.append("install.json")
         if missing:
             lines.append(f"- FAIL missing expected files: {missing}"); ok = False
         else:
-            lines.append(f"- OK structure: all {len(EXPECTED[k])} expected paths present"
-                         + (" + install.json" if name.startswith("bmaglasspay-opencart-3-") else ""))
+            lines.append(f"- OK structure: all {len(expected)} expected paths present"
+                         + (" + install.json" if name.startswith("bmaglasspay-opencart-") else ""))
         lines.append(f"- Files in zip: {len(names)}")
 
         # Odoo client tests against the UNZIPPED code

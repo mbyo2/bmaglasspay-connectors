@@ -195,7 +195,7 @@ def main() -> None:
                     wp_dir / "tests")
     for suite, expect in (("run-client-tests.php", 61),
                           ("run-blocks-tests.php", 30),
-                          ("run-reconciler-tests.php", 24),
+                          ("run-reconciler-tests.php", 26),
                           ("run-momo-gateway-tests.php", 30),
                           ("run-gateway-tests.php", 47),
                           ("run-webhook-tests.php", 36),

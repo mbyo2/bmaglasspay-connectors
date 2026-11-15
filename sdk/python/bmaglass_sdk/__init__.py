@@ -143,6 +143,9 @@ class _Transfers:
 class _PaymentLinks:
     def __init__(self, c: BMaGlass): self.c = c
     def list(self): return self.c._request("GET", "payment-links")
+    def get(self, link_id: str):
+        """One link by UUID id or link_code (the list caps at 100, newest first)."""
+        return self.c._request("GET", f"payment-links/{quote(link_id, safe='')}")
     def create(self, title: str, fee_payer: Optional[str] = None, redirect_url: Optional[str] = None, **kwargs):
         """Create a payment link. ``fee_payer`` ("seller" | "buyer") overrides
         the merchant default from ``settings.get()`` for this link only —

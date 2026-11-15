@@ -59,6 +59,7 @@ function stubFetch(handler) {
     if (url.endsWith('/wallets')) return { status: 200, body: { data: [{ id: 'w1', currency: 'ZMW', balance: 42 }], mode: 'test' } };
     if (url.endsWith('/settings')) return { status: 200, body: { data: { fee_payer_default: 'seller', platform_fee_percent: 2.5, paypal_platform_fee_percent: 1, note: 'n' }, mode: 'test' } };
     if (url.endsWith('/payment-links/link1/attempts')) return { status: 200, body: { data: [{ id: 'att1', status: 'waiting' }], mode: 'test' } };
+    if (url.endsWith('/payment-links/link1')) return { status: 200, body: { data: { id: 'pl1', title: 'Order #8', amount: 10, currency: 'ZMW', link_code: 'ABC123', status: 'active', fee_payer: 'seller', fee_amount: 0.25, buyer_total: 10, seller_receives: 9.75, payment_count: 0, total_collected: 0, created_at: 't' }, mode: 'test' } };
     if (url.endsWith('/payment-links') && init.method === 'POST') {
       // Sandbox keys CAN create payment links (settlement is simulation-only);
       // only transfers/webhook registration are live-only. The stub echoes the
@@ -81,6 +82,7 @@ function stubFetch(handler) {
   const settings = await client.settings.get();
   check('settings fee default', settings.fee_payer_default === 'seller' && settings.platform_fee_percent === 2.5 && settings.paypal_platform_fee_percent === 1);
   check('attempts', (await client.paymentLinks.attempts('link1'))[0].status === 'waiting');
+  check('get one link', (await client.paymentLinks.get('link1')).link_code === 'ABC123');
   // Sandbox keys CAN create payment links (live API, proven 2026-11-14);
   // only transfers/webhook registration are live-only.
   const feeLink = await client.paymentLinks.create({ title: 'Order #8', amount: 10, currency: 'ZMW', fee_payer: 'buyer', redirect_url: 'https://example.invalid/return' });

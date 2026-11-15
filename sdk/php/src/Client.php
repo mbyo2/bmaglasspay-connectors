@@ -191,6 +191,17 @@ class Client
     }
 
     /**
+     * GET /payment-links/{id} — one link by UUID id or link_code.
+     * The list endpoint caps at 100 (newest first); this read is how
+     * a shop reconciler verifies an older link. Throws on 404 when
+     * the link does not belong to this key's owner/environment.
+     */
+    public function getPaymentLink($idOrCode)
+    {
+        return $this->request('GET', 'payment-links/' . rawurlencode((string) $idOrCode));
+    }
+
+    /**
      * POST /payment-links — create a hosted payment link in the
      * key's environment (sandbox links settle only by simulation).
      * Returns the row including link_code; the buyer-facing
