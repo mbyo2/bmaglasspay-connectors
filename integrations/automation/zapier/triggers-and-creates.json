@@ -22,7 +22,7 @@
     "creates": {
         "create_payment_link": {
             "display": {
-                "description": "Creates a hosted BMaGlass payment link in the key's environment (a sandbox key creates a sandbox link). Currencies: ZMW, USD.",
+                "description": "Creates a hosted BMaGlass payment link in the key's environment (a sandbox key creates a sandbox link). Currencies: ZMW, USD. Optional fee_payer ('seller' | 'buyer') overrides the merchant's account default for this link; redirect_url offers the buyer a Return to store action; reference is stored as metadata.reference and returned on payment_link.paid.",
                 "label": "Create Payment Link"
             },
             "key": "create_payment_link",
@@ -51,6 +51,25 @@
                     {
                         "key": "description",
                         "label": "Description"
+                    },
+                    {
+                        "key": "fee_payer",
+                        "label": "Who funds the platform fee",
+                        "choices": [
+                            "seller",
+                            "buyer"
+                        ],
+                        "helpText": "seller (default): the 2.5% fee comes out of what you receive; buyer: the fee is added on top so you receive the full price."
+                    },
+                    {
+                        "key": "redirect_url",
+                        "label": "Return URL after payment",
+                        "helpText": "Optional https URL the hosted pay page offers as Return to store after a completed payment."
+                    },
+                    {
+                        "key": "reference",
+                        "label": "Merchant reference",
+                        "helpText": "Optional order reference, stored as metadata.reference on the link and returned on payment_link.paid so the automation can match the payment to the order."
                     }
                 ],
                 "outputFields": [
@@ -70,6 +89,29 @@
                     {
                         "key": "currency",
                         "label": "Currency"
+                    },
+                    {
+                        "key": "fee_payer",
+                        "label": "Fee payer"
+                    },
+                    {
+                        "key": "fee_amount",
+                        "label": "Platform fee",
+                        "type": "number"
+                    },
+                    {
+                        "key": "buyer_total",
+                        "label": "Buyer total",
+                        "type": "number"
+                    },
+                    {
+                        "key": "seller_receives",
+                        "label": "Seller receives",
+                        "type": "number"
+                    },
+                    {
+                        "key": "redirect_url",
+                        "label": "Return URL"
                     }
                 ],
                 "perform": {
@@ -77,7 +119,12 @@
                         "amount": "{{bundle.inputData.amount}}",
                         "currency": "{{bundle.inputData.currency}}",
                         "description": "{{bundle.inputData.description}}",
-                        "title": "{{bundle.inputData.title}}"
+                        "title": "{{bundle.inputData.title}}",
+                        "fee_payer": "{{bundle.inputData.fee_payer}}",
+                        "redirect_url": "{{bundle.inputData.redirect_url}}",
+                        "metadata": {
+                            "reference": "{{bundle.inputData.reference}}"
+                        }
                     },
                     "headers": {
                         "Content-Type": "application/json",
@@ -92,7 +139,15 @@
                     "id": "8f14e45f-ea0b-4b3f-9f2d-3f0d3f8b9c01",
                     "link_code": "12db7755bf28243f",
                     "status": "active",
-                    "title": "Order #1042"
+                    "title": "Order #1042",
+                    "fee_payer": "seller",
+                    "fee_amount": 6.25,
+                    "buyer_total": 250,
+                    "seller_receives": 243.75,
+                    "redirect_url": null,
+                    "metadata": {
+                        "reference": "Order #1042"
+                    }
                 }
             }
         }
@@ -244,6 +299,322 @@
                     },
                     "id": "evt_example",
                     "type": "payment_link.paid"
+                },
+                "type": "hook"
+            }
+        },
+        "payment_link_created": {
+            "display": {
+                "description": "Triggers when a BMaGlass payment link is created. Implemented as a REST hook against BMaGlass webhooks; event type payment_link.created.",
+                "label": "Payment Link Created"
+            },
+            "key": "payment_link_created",
+            "noun": "Payment Link",
+            "operation": {
+                "outputFields": [
+                    {
+                        "key": "data__link_code",
+                        "label": "Link code"
+                    },
+                    {
+                        "key": "data__title",
+                        "label": "Title"
+                    },
+                    {
+                        "key": "data__amount",
+                        "label": "Amount",
+                        "type": "number"
+                    },
+                    {
+                        "key": "data__currency",
+                        "label": "Currency"
+                    },
+                    {
+                        "key": "data__fee_payer",
+                        "label": "Fee payer"
+                    },
+                    {
+                        "key": "data__buyer_total",
+                        "label": "Buyer total",
+                        "type": "number"
+                    },
+                    {
+                        "key": "data__seller_receives",
+                        "label": "Seller receives",
+                        "type": "number"
+                    }
+                ],
+                "performSubscribe": {
+                    "body": {
+                        "events": [
+                            "payment_link.created"
+                        ],
+                        "url": "{{bundle.targetUrl}}"
+                    },
+                    "headers": {
+                        "Content-Type": "application/json",
+                        "X-Api-Key": "{{bundle.authData.api_key}}"
+                    },
+                    "method": "POST",
+                    "url": "https://hhxwwozpvgktuqutfkhc.supabase.co/functions/v1/developer-api/webhooks"
+                },
+                "performUnsubscribe": {
+                    "headers": {
+                        "X-Api-Key": "{{bundle.authData.api_key}}"
+                    },
+                    "method": "DELETE",
+                    "url": "https://hhxwwozpvgktuqutfkhc.supabase.co/functions/v1/developer-api/webhooks/{{bundle.subscribeData.id}}"
+                },
+                "sample": {
+                    "created": "2026-10-26T00:00:00.000Z",
+                    "data": {
+                        "amount": 250,
+                        "buyer_total": 250,
+                        "created_at": "2026-10-26T00:00:00.000Z",
+                        "currency": "ZMW",
+                        "environment": "sandbox",
+                        "fee_amount": 6.25,
+                        "fee_payer": "seller",
+                        "id": "8f14e45f-ea0b-4b3f-9f2d-3f0d3f8b9c01",
+                        "link_code": "12db7755bf28243f",
+                        "livemode": false,
+                        "redirect_url": null,
+                        "seller_receives": 243.75,
+                        "status": "active",
+                        "title": "Order #1042"
+                    },
+                    "id": "evt_example",
+                    "type": "payment_link.created"
+                },
+                "type": "hook"
+            }
+        },
+        "invoice_created": {
+            "display": {
+                "description": "Triggers when an invoice is created via the developer API. Implemented as a REST hook against BMaGlass webhooks; event type invoice.created.",
+                "label": "Invoice Created"
+            },
+            "key": "invoice_created",
+            "noun": "Invoice",
+            "operation": {
+                "outputFields": [
+                    {
+                        "key": "data__id",
+                        "label": "Invoice ID"
+                    },
+                    {
+                        "key": "data__amount",
+                        "label": "Amount",
+                        "type": "number"
+                    },
+                    {
+                        "key": "data__currency",
+                        "label": "Currency"
+                    },
+                    {
+                        "key": "data__customer_email",
+                        "label": "Customer email"
+                    },
+                    {
+                        "key": "data__status",
+                        "label": "Status"
+                    }
+                ],
+                "performSubscribe": {
+                    "body": {
+                        "events": [
+                            "invoice.created"
+                        ],
+                        "url": "{{bundle.targetUrl}}"
+                    },
+                    "headers": {
+                        "Content-Type": "application/json",
+                        "X-Api-Key": "{{bundle.authData.api_key}}"
+                    },
+                    "method": "POST",
+                    "url": "https://hhxwwozpvgktuqutfkhc.supabase.co/functions/v1/developer-api/webhooks"
+                },
+                "performUnsubscribe": {
+                    "headers": {
+                        "X-Api-Key": "{{bundle.authData.api_key}}"
+                    },
+                    "method": "DELETE",
+                    "url": "https://hhxwwozpvgktuqutfkhc.supabase.co/functions/v1/developer-api/webhooks/{{bundle.subscribeData.id}}"
+                },
+                "sample": {
+                    "created": "2026-10-26T00:00:00.000Z",
+                    "data": {
+                        "amount": 250,
+                        "created_at": "2026-10-26T00:00:00.000Z",
+                        "currency": "ZMW",
+                        "customer_email": "buyer@example.com",
+                        "description": "Order #1042",
+                        "environment": "sandbox",
+                        "id": "8f14e45f-ea0b-4b3f-9f2d-3f0d3f8b9c01",
+                        "livemode": false,
+                        "metadata": {},
+                        "paid_at": null,
+                        "status": "open"
+                    },
+                    "id": "evt_example",
+                    "type": "invoice.created"
+                },
+                "type": "hook"
+            }
+        },
+        "invoice_paid": {
+            "display": {
+                "description": "Triggers when a sandbox invoice is driven to paid through the simulate-payment endpoint (flagged simulated: true). Implemented as a REST hook against BMaGlass webhooks; event type invoice.paid.",
+                "label": "Invoice Paid"
+            },
+            "key": "invoice_paid",
+            "noun": "Invoice",
+            "operation": {
+                "outputFields": [
+                    {
+                        "key": "data__id",
+                        "label": "Invoice ID"
+                    },
+                    {
+                        "key": "data__amount",
+                        "label": "Amount",
+                        "type": "number"
+                    },
+                    {
+                        "key": "data__currency",
+                        "label": "Currency"
+                    },
+                    {
+                        "key": "data__customer_email",
+                        "label": "Customer email"
+                    },
+                    {
+                        "key": "data__paid_at",
+                        "label": "Paid at"
+                    }
+                ],
+                "performSubscribe": {
+                    "body": {
+                        "events": [
+                            "invoice.paid"
+                        ],
+                        "url": "{{bundle.targetUrl}}"
+                    },
+                    "headers": {
+                        "Content-Type": "application/json",
+                        "X-Api-Key": "{{bundle.authData.api_key}}"
+                    },
+                    "method": "POST",
+                    "url": "https://hhxwwozpvgktuqutfkhc.supabase.co/functions/v1/developer-api/webhooks"
+                },
+                "performUnsubscribe": {
+                    "headers": {
+                        "X-Api-Key": "{{bundle.authData.api_key}}"
+                    },
+                    "method": "DELETE",
+                    "url": "https://hhxwwozpvgktuqutfkhc.supabase.co/functions/v1/developer-api/webhooks/{{bundle.subscribeData.id}}"
+                },
+                "sample": {
+                    "created": "2026-10-26T00:00:00.000Z",
+                    "data": {
+                        "amount": 250,
+                        "created_at": "2026-10-26T00:00:00.000Z",
+                        "currency": "ZMW",
+                        "customer_email": "buyer@example.com",
+                        "description": "Order #1042",
+                        "environment": "sandbox",
+                        "id": "8f14e45f-ea0b-4b3f-9f2d-3f0d3f8b9c01",
+                        "livemode": false,
+                        "metadata": {},
+                        "paid_at": "2026-10-26T00:00:00.000Z",
+                        "simulated": true,
+                        "status": "paid"
+                    },
+                    "id": "evt_example",
+                    "type": "invoice.paid"
+                },
+                "type": "hook"
+            }
+        },
+        "mobile_money_collection_completed": {
+            "display": {
+                "description": "Triggers when a mobile-money collection settles (exactly once per settlement). Implemented as a REST hook against BMaGlass webhooks; event type mobile_money.collection.completed.",
+                "label": "Mobile Money Collection Completed"
+            },
+            "key": "mobile_money_collection_completed",
+            "noun": "Mobile Money Collection",
+            "operation": {
+                "outputFields": [
+                    {
+                        "key": "data__reference",
+                        "label": "Platform reference"
+                    },
+                    {
+                        "key": "data__merchant_reference",
+                        "label": "Merchant reference"
+                    },
+                    {
+                        "key": "data__amount",
+                        "label": "Amount",
+                        "type": "number"
+                    },
+                    {
+                        "key": "data__currency",
+                        "label": "Currency"
+                    },
+                    {
+                        "key": "data__operator",
+                        "label": "Operator"
+                    },
+                    {
+                        "key": "data__fee_bearer",
+                        "label": "Fee bearer"
+                    },
+                    {
+                        "key": "data__transaction_id",
+                        "label": "Settlement transaction ID"
+                    }
+                ],
+                "performSubscribe": {
+                    "body": {
+                        "events": [
+                            "mobile_money.collection.completed"
+                        ],
+                        "url": "{{bundle.targetUrl}}"
+                    },
+                    "headers": {
+                        "Content-Type": "application/json",
+                        "X-Api-Key": "{{bundle.authData.api_key}}"
+                    },
+                    "method": "POST",
+                    "url": "https://hhxwwozpvgktuqutfkhc.supabase.co/functions/v1/developer-api/webhooks"
+                },
+                "performUnsubscribe": {
+                    "headers": {
+                        "X-Api-Key": "{{bundle.authData.api_key}}"
+                    },
+                    "method": "DELETE",
+                    "url": "https://hhxwwozpvgktuqutfkhc.supabase.co/functions/v1/developer-api/webhooks/{{bundle.subscribeData.id}}"
+                },
+                "sample": {
+                    "created": "2026-10-26T00:00:00.000Z",
+                    "data": {
+                        "amount": 101,
+                        "base_amount": 100,
+                        "collection_id": "7c2f1a44-0000-4000-8000-000000000003",
+                        "currency": "ZMW",
+                        "environment": "sandbox",
+                        "fee_bearer": "buyer",
+                        "merchant_reference": "woo-order-1042",
+                        "operator": "mtn",
+                        "reference": "BMG-20261026-0001",
+                        "service_charge": 1,
+                        "settled_at": "2026-10-26T00:00:00.000Z",
+                        "status": "successful",
+                        "transaction_id": "7c2f1a44-0000-4000-8000-000000000001"
+                    },
+                    "id": "evt_example",
+                    "type": "mobile_money.collection.completed"
                 },
                 "type": "hook"
             }

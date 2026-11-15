@@ -8,8 +8,8 @@ Every zip carries install instructions: `INSTALL/README.md` at its root (store m
 
 ## bmaglasspay-automation-1.0.0.zip
 
-- Size: 8455 bytes
-- SHA-256: `c65ba8276256acb7302dc0d2af97abc98bb12e8640cee7bb7b19c0adf9c587a1`
+- Size: 10147 bytes
+- SHA-256: `e0b958735eecdc967f098821eaa8add631adc8f8d549d5825ed86d9e89cc16cb`
 - Download: https://hhxwwozpvgktuqutfkhc.supabase.co/storage/v1/object/public/downloads/bmaglasspay-automation-1.0.0.zip
 - Install: Unzip, read `README.md`, import the Zapier / Make recipe
 - Files (11):
@@ -27,8 +27,8 @@ Every zip carries install instructions: `INSTALL/README.md` at its root (store m
 
 ## bmaglasspay-embed-button-1.0.0.zip
 
-- Size: 4798 bytes
-- SHA-256: `449cff1d7845183ea74c4a4d3f9bafb17fc1e0129e18ebf39953c53e25d1bb79`
+- Size: 5333 bytes
+- SHA-256: `a39b8e4a59773146b46bd47184c5577528f44656687a751a8605ab8943684dd7`
 - Download: https://hhxwwozpvgktuqutfkhc.supabase.co/storage/v1/object/public/downloads/bmaglasspay-embed-button-1.0.0.zip
 - Install: Copy `bmaglass-pay-button.js` into any web page (see `demo.html`)
 - Files (4):

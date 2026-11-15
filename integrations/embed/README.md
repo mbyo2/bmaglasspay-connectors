@@ -16,8 +16,12 @@ if it detects a `bmg_...` / `bmp_...` API key in its configuration.
 ## Steps
 
 1. **Create a payment link** — in the BMaGlass Pay app (Payment
-   Links) or via the developer API (`POST /payment-links`, production key).
-   Set the exact amount and currency (ZMW or USD).
+   Links) or via the developer API (`POST /payment-links`). A
+   production key makes a live link; a sandbox key makes a sandbox
+   link (the hosted pay page refuses sandbox links — they can only
+   be settled through the API's simulate-payment endpoint, so use
+   them to test the button, never to take a real payment). Set the
+   exact amount and currency — ZMW or USD only.
 2. **Add the placeholder** where the button should appear:
 
    ```html
@@ -54,6 +58,18 @@ wallet the link belongs to. For order confirmation on platforms
 with webhooks/cron, use the developer API's reconciliation pattern
 (see the WooCommerce/Odoo connectors); on closed platforms, the
 app's payment-link history and notifications are your record.
+
+## If no button appears
+
+The script renders nothing for a bad placeholder — by design it
+never renders a broken button — so check the browser console: an
+invalid `data-link` / `data-code` logs an error there, and an API
+key anywhere in the configuration is refused with an error too.
+Common causes: a non-`https://bmaglasspay.online/pay/<code>` URL,
+a sandbox link's code pasted by mistake where a live link was
+meant (the button still renders — the hosted page itself refuses
+sandbox links), or the script tag pointing at a file that is not
+served (the script must be reachable at its `src` URL).
 
 ## Verification in this repo
 

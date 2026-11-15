@@ -8,12 +8,12 @@ Release version: **1.0.0**. Validated against the UNZIPPED zip contents (not the
 - OK bmaglasspay-automation-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-automation-1.0.0.zip: no bytecode
 - OK bmaglasspay-automation-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-automation-1.0.0.zip: 8455 bytes, sha256 `c65ba8276256acb7302dc0d2af97abc98bb12e8640cee7bb7b19c0adf9c587a1`, 11 files
+  - bmaglasspay-automation-1.0.0.zip: 10147 bytes, sha256 `e0b958735eecdc967f098821eaa8add631adc8f8d549d5825ed86d9e89cc16cb`, 11 files
 - OK bmaglasspay-embed-button-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-embed-button-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-embed-button-1.0.0.zip: no bytecode
 - OK bmaglasspay-embed-button-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-embed-button-1.0.0.zip: 4798 bytes, sha256 `449cff1d7845183ea74c4a4d3f9bafb17fc1e0129e18ebf39953c53e25d1bb79`, 4 files
+  - bmaglasspay-embed-button-1.0.0.zip: 5333 bytes, sha256 `a39b8e4a59773146b46bd47184c5577528f44656687a751a8605ab8943684dd7`, 4 files
 - OK bmaglasspay-magento-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-magento-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-magento-1.0.0.zip: no bytecode
@@ -680,7 +680,13 @@ PASS  target _blank + noopener
 PASS  API key config refused
 PASS  refusal is explained in console
 PASS  foreign host refused
+PASS  refusal is an error, not a warning
 PASS  http (not https) refused
+PASS  API key in label refused
+PASS  API key in code refused
+PASS  padded code renders trimmed
+PASS  non-blank target sets nothing
+PASS  code with slash refused
 
 ALL EMBED TESTS PASSED
 ```
