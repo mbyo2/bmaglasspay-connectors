@@ -166,6 +166,8 @@ check("default link resolves fee_payer from the merchant setting",
 // the mode the merchant is currently in.)
 check("momo collection fee_bearer matches GET /settings",
   mmSettled.fee_bearer === settings.momo_fee_bearer);
+check("momo service_charge is 1% of base_amount in either mode (ext-hunt: it is NOT 0 in seller mode — the seller funds it)",
+  Math.abs(Number(mmSettled.service_charge) - Math.round(Number(mmSettled.base_amount) * 0.01 * 100) / 100) < 0.005);
 check("momo seller/buyer arithmetic holds for the settled collection",
   (mmSettled.fee_bearer === "seller" && Number(mmSettled.amount) === Number(mmSettled.base_amount)) ||
   (mmSettled.fee_bearer === "buyer" && Math.abs(Number(mmSettled.amount) - Number(mmSettled.base_amount) - Number(mmSettled.service_charge)) < 0.005));

@@ -47,7 +47,7 @@ $transport = function ($method, $url, $headers, $body) use (&$calls) {
     }
     if (str_ends_with($url, '/invoices') && $method === 'POST') {
         $req = json_decode($body, true);
-        return array(201, json_encode(array('data' => array('id' => 'inv1', 'amount' => $req['amount'], 'currency' => 'ZMW', 'status' => 'open', 'environment' => 'sandbox'), 'mode' => 'test')));
+        return array(201, json_encode(array('data' => array('id' => 'inv1', 'amount' => $req['amount'], 'currency' => $req['currency'] ?? 'ZMW', 'status' => 'open', 'environment' => 'sandbox'), 'mode' => 'test')));
     }
     if (str_ends_with($url, '/invoices/inv1/simulate-payment')) {
         return array(200, json_encode(array('data' => array('id' => 'inv1', 'status' => 'paid', 'environment' => 'sandbox'), 'mode' => 'test', 'simulated' => true)));
@@ -76,6 +76,14 @@ $transport = function ($method, $url, $headers, $body) use (&$calls) {
     }
     if (str_ends_with($url, '/payment-links/link1/attempts')) {
         return array(200, json_encode(array('data' => array(array('id' => 'att1', 'status' => 'waiting')), 'mode' => 'test')));
+    }
+    if (str_ends_with($url, '/mobile-money/collections') && $method === 'POST') {
+        $req = json_decode($body, true);
+        return array(201, json_encode(array('data' => array('reference' => 'BMG-C1', 'merchant_reference' => $req['reference'] ?? null, 'amount' => $req['amount'], 'base_amount' => $req['amount'], 'service_charge' => round(($req['amount'] ?? 0) * 0.01, 2), 'fee_bearer' => 'seller', 'status' => 'pending'), 'mode' => 'test')));
+    }
+    if (str_ends_with($url, '/bitcoin/quote') && $method === 'POST') {
+        $req = json_decode($body, true);
+        return array(201, json_encode(array('data' => array('id' => 'q1', 'side' => $req['side'] ?? 'buy'), 'mode' => 'test')));
     }
     return array(404, json_encode(array('error' => 'not_found', 'message' => 'no route')));
 };
@@ -160,6 +168,51 @@ try {
 $live->createTransfer('user-2', 25, 'ZMW', null, null, 'idem-7');
 $last = end($calls);
 check('Idempotency-Key header', strpos(implode(' ', $last['headers']), 'Idempotency-Key: idem-7') !== false);
+
+// ── ext-hunt fixes ──
+// Invoices are NOT currency-guarded: the API accepts any 3-letter
+// invoice currency, so a EUR invoice must reach the API (it used to be
+// refused client-side with zero requests sent).
+$callsBefore = count($calls);
+$eurInv = $test->createInvoice(10, 'EUR');
+$last = end($calls);
+$sent = json_decode($last['body'], true);
+eq('EUR invoice sent', $sent['currency'], 'EUR');
+eq('EUR invoice created', $eurInv['currency'], 'EUR');
+check('EUR invoice made a request', count($calls) > $callsBefore);
+// Metadata rides on invoice creation (parity with TS/Python/RN).
+$test->createInvoice(10, 'ZMW', null, null, array('order' => '42'));
+$last = end($calls);
+$sent = json_decode($last['body'], true);
+eq('invoice metadata sent', $sent['metadata'], array('order' => '42'));
+// A bad quote side is refused client-side: it used to be silently
+// coerced to a buy quote, flipping the money direction on a typo.
+try {
+    $test->bitcoinQuote('bogus', 100);
+    check('bad side refused', false);
+} catch (ApiException $e) {
+    eq('bad side code', $e->errorCode, 'invalid_side');
+}
+try {
+    $test->bitcoinQuote('selll', null, 5000);
+    check('typo side refused', false);
+} catch (ApiException $e) {
+    eq('typo side code', $e->errorCode, 'invalid_side');
+}
+$quote = $test->bitcoinQuote('sell', null, 5000);
+eq('sell quote side', $quote['side'], 'sell');
+// Mobile-money create accepts an explicit idempotency key (parity
+// with TS/Python/RN); the merchant reference still doubles as the key
+// when no explicit key is given.
+$coll = $test->createMobileMoneyCollection(100, '0961111111', 'mtn', 'order-42', 'idem-99');
+$last = end($calls);
+$sent = json_decode($last['body'], true);
+eq('momo idempotency_key sent', $sent['idempotency_key'], 'idem-99');
+eq('momo reference sent', $sent['reference'], 'order-42');
+// Live momo shape: service_charge is 1% of base_amount in BOTH modes
+// (the seller funds it in seller mode; it is NOT 0).
+check('momo service_charge is 1% of base', $coll['service_charge'] == 1.0);
+eq('momo fee_bearer', $coll['fee_bearer'], 'seller');
 
 // Shared cross-SDK HMAC known-answer vector.
 $raw = '{"id":"evt_1","type":"webhook.test","created":"2026-10-26T00:00:00.000Z","data":{"ping":true}}';

@@ -109,5 +109,51 @@ function stubFetch(handler) {
   }
 }
 
+// --- ext-hunt fixes: transport, encoding, client-side validation ---
+{
+  // Transport failures are typed BMaGlassErrors, never raw TypeErrors.
+  const throwing = new BMaGlass({ apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', fetchImpl: async () => { throw new TypeError('fetch failed'); } });
+  try { await throwing.wallets.list(); check('network throw typed', false); }
+  catch (e) { check('network throw typed', e instanceof BMaGlassError && e.status === 0 && e.code === 'network_error'); }
+
+  // A request that never settles fails as network_error after timeoutMs.
+  const hanging = new BMaGlass({ apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', timeoutMs: 50, fetchImpl: () => new Promise(() => {}) });
+  const timedOut = await Promise.race([
+    hanging.wallets.list().then(() => 'RESOLVED?!').catch((e) => (e instanceof BMaGlassError && e.code === 'network_error' ? 'TIMEOUT-TYPED' : `WRONG-ERROR ${e}`)),
+    new Promise((r) => setTimeout(() => r('GUARD'), 3000)),
+  ]);
+  check('hanging request times out typed', timedOut === 'TIMEOUT-TYPED');
+
+  const fetchImpl = stubFetch((url, init) => {
+    if (url.endsWith('/invoices') && init.method === 'POST') return { status: 201, body: { data: { id: 'inv1', status: 'open' }, mode: 'test' } };
+    return { status: 404, body: { error: 'not_found', message: 'no route' } };
+  });
+  const client = new BMaGlass({ apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', fetchImpl });
+  // Ids are URL-encoded (an id containing "/" used to split the path).
+  await client.invoices.get('a/b').catch(() => {});
+  check('invoice id encoded', fetchImpl.calls.at(-1).url === 'http://local.test/invoices/a%2Fb');
+  await client.paymentLinks.attempts('x/y').catch(() => {});
+  check('attempts id encoded', fetchImpl.calls.at(-1).url === 'http://local.test/payment-links/x%2Fy/attempts');
+  await client.webhooks.test('w/z').catch(() => {});
+  check('webhook id encoded', fetchImpl.calls.at(-1).url === 'http://local.test/webhooks/w%2Fz/test');
+  // Client-side refusals send no request at all.
+  const before = fetchImpl.calls.length;
+  try { await client.paymentLinks.create({ title: 'Bad', amount: 10, fee_payer: 'nobody' }); check('bad fee_payer refused', false); }
+  catch (e) { check('bad fee_payer refused', e.code === 'invalid_fee_payer'); }
+  try { await client.bitcoin.quote({ side: 'bogus', amount_zmw: 100 }); check('bad side refused', false); }
+  catch (e) { check('bad side refused', e.code === 'invalid_side'); }
+  try { await client.paymentLinks.create({ title: 'Euro', amount: 10, currency: 'EUR' }); check('EUR link refused', false); }
+  catch (e) { check('EUR link refused', e.code === 'unsupported_currency'); }
+  check('refused calls sent nothing', fetchImpl.calls.length === before);
+  // Invoices are NOT currency-guarded: the API accepts any 3-letter
+  // invoice currency, so the EUR invoice must reach the API.
+  const eurInvoice = await client.invoices.create({ amount: 10, currency: 'EUR' });
+  check('EUR invoice sent', eurInvoice.status === 'open' && JSON.parse(fetchImpl.calls.at(-1).init.body).currency === 'EUR');
+  // Non-JSON error bodies still map to a typed error.
+  const html502 = new BMaGlass({ apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', fetchImpl: async () => ({ ok: false, status: 502, text: async () => '<html>Bad Gateway</html>' }) });
+  try { await html502.wallets.list(); check('html 502 typed', false); }
+  catch (e) { check('html 502 typed', e instanceof BMaGlassError && e.status === 502 && e.code === 'request_failed'); }
+}
+
 console.log(failures === 0 ? '\nALL REACT NATIVE SDK TESTS PASSED' : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);
