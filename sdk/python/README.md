@@ -15,3 +15,9 @@ ok = verify_webhook_signature(request.data, request.headers["X-BMaGlass-Signatur
 
 Tests: `python3 -m unittest discover sdk/tests -v` from the repo root.
 Errors raise `BMaGlassError` with `.status` and `.code` (e.g. `test_mode_read_only`).
+Transport failures and requests that exceed the 30s timeout (overridable
+via the `timeout` constructor argument) also raise `BMaGlassError`
+(`network_error`). Transfers and payment links accept ZMW and USD only
+(anything else raises `unsupported_currency`); invoices accept any
+3-letter currency. Use `payment_link_url(link_code)` for the
+buyer-facing hosted pay page URL.
