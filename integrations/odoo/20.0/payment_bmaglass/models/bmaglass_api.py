@@ -105,6 +105,37 @@ def paid_event_matches(data, link_code, amount, currency):
     return True, "ok"
 
 
+def momo_event_matches(data, merchant_reference, amount, currency="ZMW"):
+    """Pure check: does a mobile_money.collection.completed event's
+    `data` settle the transaction that started the collection with
+    merchant reference `merchant_reference` for `amount`?
+
+    The webhook route HMAC-verified the payload before this runs; this
+    is the second, semantic line of defence (right merchant reference,
+    ZMW, the product amount covered). The event carries the platform
+    reference in `reference` and the merchant's own reference echoed
+    back in `merchant_reference`; the amount to compare is
+    `base_amount` (the product amount) when present, else `amount`
+    (the total charged — in buyer-pays mode that includes the 1%
+    service charge, so it always covers the product amount too).
+    Returns (ok, reason) — reason is for logs, never shown to buyers.
+    """
+    if not isinstance(data, dict):
+        return False, "payload data is not an object"
+    if not merchant_reference or data.get("merchant_reference") != merchant_reference:
+        return False, "merchant_reference mismatch"
+    if str(data.get("currency") or "ZMW").upper() != str(currency or "").upper():
+        return False, "currency mismatch"
+    raw = data.get("base_amount", data.get("amount"))
+    try:
+        paid = float(raw)
+    except (TypeError, ValueError):
+        return False, "amount missing or not numeric"
+    if paid + 0.009 < round(float(amount), 2):
+        return False, "amount below the transaction total"
+    return True, "ok"
+
+
 def payment_link_url(link_code):
     """Hosted payment page URL for a link code."""
     return "%s/pay/%s" % (SITE_BASE, link_code)
@@ -270,7 +301,22 @@ class BMaGlassClient:
         return self._request("GET", "payment-links")
 
     def create_payment_link(self, title, amount=None, currency="ZMW",
-                            description=None, expires_at=None):
+                            description=None, expires_at=None,
+                            fee_payer=None, redirect_url=None):
+        """Create a payment link.
+
+        ``fee_payer`` ("seller" | "buyer") overrides the merchant's
+        account default for this link only — omit it to inherit the
+        default (GET /settings -> fee_payer_default). ``redirect_url``
+        is the buyer return URL the hosted pay page offers after
+        payment (omit it and the buyer gets no way back to the store).
+        Both mirror the Python SDK's create(); an invalid fee_payer
+        raises before any transport happens.
+        """
+        if fee_payer is not None and fee_payer not in ("seller", "buyer"):
+            raise BMaGlassError(
+                0, "invalid_fee_payer",
+                "fee_payer must be 'seller' or 'buyer'.")
         body = {"title": str(title), "currency": assert_supported_currency(currency)}
         if amount is not None:
             body["amount"] = round(float(amount), 2)
@@ -278,6 +324,10 @@ class BMaGlassClient:
             body["description"] = description
         if expires_at is not None:
             body["expires_at"] = expires_at
+        if fee_payer is not None:
+            body["fee_payer"] = fee_payer
+        if redirect_url is not None:
+            body["redirect_url"] = redirect_url
         return self._request("POST", "payment-links", body)
 
     def payment_link_attempts(self, link_id):
@@ -294,7 +344,12 @@ class BMaGlassClient:
         collection and doubles as the idempotency key: repeating a
         create with the same reference returns the original
         collection instead of charging the customer twice."""
-        body = {"amount": round(float(amount), 2), "phone": str(phone)}
+        phone = str(phone or "").strip()
+        if not phone:
+            raise BMaGlassError(
+                0, "invalid_phone",
+                "A mobile money number is needed to send the payment prompt to.")
+        body = {"amount": round(float(amount), 2), "phone": phone}
         if operator is not None:
             body["operator"] = operator
         if reference is not None:

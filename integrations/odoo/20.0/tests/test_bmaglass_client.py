@@ -37,9 +37,34 @@ class FakeTransport:
             if headers.get("X-Api-Key", "").startswith("bmp_test_"):
                 return 403, json.dumps({"error": "test_mode_read_only", "message": "Test keys are read-only"})
             req = json.loads(raw)
+            fee_payer = req.get("fee_payer", "seller")
+            amt = req.get("amount") or 0
+            fee = round(amt * 0.025, 2)
             return 201, json.dumps({"data": {"id": "pl1", "title": req["title"],
-                                             "amount": req.get("amount"), "currency": req["currency"],
-                                             "link_code": "ABC123"}, "mode": "live"})
+                                             "amount": amt, "currency": req["currency"],
+                                             "link_code": "ABC123",
+                                             "fee_payer": fee_payer,
+                                             "redirect_url": req.get("redirect_url"),
+                                             "fee_amount": fee,
+                                             "buyer_total": round(amt + fee, 2) if fee_payer == "buyer" else amt,
+                                             "seller_receives": amt if fee_payer == "buyer" else round(amt - fee, 2)},
+                                    "mode": "live"})
+        if url.endswith("/mobile-money/collections") and method == "POST":
+            req = json.loads(raw)
+            return 201, json.dumps({"data": {"reference": "BMG-TEST1",
+                                             "merchant_reference": req.get("reference"),
+                                             "status": "pending",
+                                             "amount": req.get("amount"),
+                                             "base_amount": req.get("amount"),
+                                             "currency": "ZMW",
+                                             "phone": req.get("phone"),
+                                             "fee_bearer": "seller"}, "mode": "test"})
+        if "/mobile-money/collections/" in url and method == "GET":
+            return 200, json.dumps({"data": {"reference": "BMG-TEST1",
+                                             "merchant_reference": "SO001",
+                                             "status": "successful",
+                                             "amount": 5, "base_amount": 5,
+                                             "currency": "ZMW"}, "mode": "test"})
         if url.endswith("/webhooks") and method == "POST":
             return 201, json.dumps({"data": {"id": "wh1", "secret": "whsec_testsecret"}, "mode": "live"})
         if url.endswith("/settings"):
@@ -103,6 +128,59 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(self.test_client.payment_link_attempts("pl1")[0]["status"], "waiting")
 
 
+    def test_create_link_redirect_url_and_fee_payer(self):
+        link = self.live_client.create_payment_link(
+            "Order S0001", amount=100, currency="ZMW",
+            redirect_url="https://odoo.example/payment/confirmation?tx_id=1",
+            fee_payer="buyer")
+        self.assertEqual(link["fee_payer"], "buyer")
+        self.assertEqual(link["redirect_url"],
+                         "https://odoo.example/payment/confirmation?tx_id=1")
+        self.assertEqual(link["buyer_total"], 102.5)
+        self.assertEqual(link["seller_receives"], 100)
+        sent = self.transport.calls[-1]["body"]
+        self.assertEqual(sent["redirect_url"],
+                         "https://odoo.example/payment/confirmation?tx_id=1")
+        self.assertEqual(sent["fee_payer"], "buyer")
+
+    def test_create_link_invalid_fee_payer_raises_before_transport(self):
+        before = len(self.transport.calls)
+        with self.assertRaises(api.BMaGlassError) as ctx:
+            self.live_client.create_payment_link("Order", amount=5, fee_payer="merchant")
+        self.assertEqual(ctx.exception.code, "invalid_fee_payer")
+        self.assertEqual(len(self.transport.calls), before)
+
+    def test_create_link_defaults_omit_optional(self):
+        link = self.live_client.create_payment_link("Order S0001", amount=10.5, currency="ZMW")
+        sent = self.transport.calls[-1]["body"]
+        self.assertNotIn("fee_payer", sent)
+        self.assertNotIn("redirect_url", sent)
+        self.assertEqual(link["fee_payer"], "seller")
+        self.assertIsNone(link["redirect_url"])
+
+    def test_momo_collection_create_sends_reference_and_phone(self):
+        col = self.test_client.create_mobile_money_collection(
+            5, " 0961111111 ", reference="SO001")
+        self.assertEqual(col["reference"], "BMG-TEST1")
+        self.assertEqual(col["merchant_reference"], "SO001")
+        self.assertEqual(col["status"], "pending")
+        sent = self.transport.calls[-1]["body"]
+        self.assertEqual(sent["phone"], "0961111111")
+        self.assertEqual(sent["reference"], "SO001")
+
+    def test_momo_collection_empty_phone_raises_before_transport(self):
+        before = len(self.transport.calls)
+        with self.assertRaises(api.BMaGlassError) as ctx:
+            self.test_client.create_mobile_money_collection(5, "   ")
+        self.assertEqual(ctx.exception.code, "invalid_phone")
+        self.assertEqual(len(self.transport.calls), before)
+
+    def test_momo_collection_get(self):
+        col = self.test_client.get_mobile_money_collection("SO001")
+        self.assertEqual(col["status"], "successful")
+        self.assertEqual(col["merchant_reference"], "SO001")
+
+
 class WebhookVerifyTest(unittest.TestCase):
     # Shared cross-SDK known-answer vector (sdk/tests, TS + Python SDKs).
     RAW = b'{"id":"evt_1","type":"webhook.test","created":"2026-10-26T00:00:00.000Z","data":{"ping":true}}'
@@ -162,3 +240,48 @@ class PaidEventMatchTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MomoEventMatchTest(unittest.TestCase):
+    """mobile_money.collection.completed semantic guard: right merchant
+    reference, ZMW, product amount (base_amount) covered."""
+
+    DATA = {"reference": "BMG-1", "merchant_reference": "SO001",
+            "status": "successful", "amount": 5.05, "base_amount": 5,
+            "currency": "ZMW", "fee_bearer": "buyer"}
+
+    def test_exact_match_buyer_pays(self):
+        ok, _ = api.momo_event_matches(self.DATA, "SO001", 5.00)
+        self.assertTrue(ok)
+
+    def test_amount_field_fallback_seller_pays(self):
+        data = {k: v for k, v in self.DATA.items() if k != "base_amount"}
+        data["amount"] = 5
+        ok, _ = api.momo_event_matches(data, "SO001", 5.00)
+        self.assertTrue(ok)
+
+    def test_wrong_merchant_reference_declined(self):
+        ok, reason = api.momo_event_matches(self.DATA, "SO002", 5)
+        self.assertFalse(ok)
+        self.assertIn("merchant_reference", reason)
+
+    def test_platform_reference_alone_does_not_match(self):
+        # `reference` is the platform BMG-... ref, never the merchant ref.
+        ok, _ = api.momo_event_matches(self.DATA, "BMG-1", 5)
+        self.assertFalse(ok)
+
+    def test_wrong_currency_declined(self):
+        ok, reason = api.momo_event_matches(
+            {**self.DATA, "currency": "USD"}, "SO001", 5)
+        self.assertFalse(ok)
+        self.assertIn("currency", reason)
+
+    def test_short_base_amount_declined(self):
+        ok, reason = api.momo_event_matches(
+            {**self.DATA, "base_amount": 2}, "SO001", 5)
+        self.assertFalse(ok)
+        self.assertIn("amount", reason)
+
+    def test_non_dict_declined(self):
+        ok, _ = api.momo_event_matches(None, "SO001", 5)
+        self.assertFalse(ok)
