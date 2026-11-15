@@ -47,14 +47,19 @@ class ControllerExtensionPaymentBmaglasspay extends Controller
         if (!$order) {
             $json['error'] = $this->language->get('error_order');
         } else {
-            $row = $this->db->query('SELECT `link_code` FROM `' . DB_PREFIX . 'bmaglasspay_orders` WHERE `order_id` = ' . $order_id)->row;
-            if ($row) {
-                $json['redirect'] = Client::paymentLinkUrl($row['link_code']);
-            } else {
-                try {
-                    // apiClient() performs the SDK require_once; it must
-                    // run BEFORE any Client:: static call (B17).
-                    $client = $this->apiClient();
+            try {
+                // Load the SDK FIRST: the reuse path below calls
+                // Client::paymentLinkUrl(), which fatals while the class
+                // is unloaded — OpenCart's library autoloader maps the
+                // namespaced SDK class to
+                // system/library/bmaglass/sdk/client.php, which does not
+                // exist (the file is system/library/bmaglass/Client.php),
+                // so nothing else loads it for us.
+                $client = $this->apiClient();
+                $row = $this->db->query('SELECT `link_code` FROM `' . DB_PREFIX . 'bmaglasspay_orders` WHERE `order_id` = ' . $order_id)->row;
+                if ($row) {
+                    $json['redirect'] = Client::paymentLinkUrl($row['link_code']);
+                } else {
                     $currency = Client::assertSupportedCurrency($order['currency_code']);
                     $link = $client->createPaymentLink(
                         'Order #' . $order_id,
@@ -69,8 +74,23 @@ class ControllerExtensionPaymentBmaglasspay extends Controller
                     $this->db->query('INSERT INTO `' . DB_PREFIX . 'bmaglasspay_orders` SET `order_id` = ' . $order_id
                         . ', `link_code` = \'' . $this->db->escape($link['link_code']) . '\', `paid` = 0');
                     $json['redirect'] = Client::paymentLinkUrl($link['link_code']);
-                } catch (ApiException $e) {
-                    $json['error'] = $e->userMessage();
+                }
+            } catch (ApiException $e) {
+                $json['error'] = $e->userMessage();
+            } catch (\Exception $e) {
+                // Lost a race with another confirm for this order
+                // (double-click): the other request stored its link —
+                // reuse it instead of failing the checkout with a 500.
+                // (Any other failure lands here too, with no row stored.)
+                try {
+                    $retry = $this->db->query('SELECT `link_code` FROM `' . DB_PREFIX . 'bmaglasspay_orders` WHERE `order_id` = ' . $order_id)->row;
+                } catch (\Exception $ignored) {
+                    $retry = null;
+                }
+                if ($retry) {
+                    $json['redirect'] = Client::paymentLinkUrl($retry['link_code']);
+                } else {
+                    $json['error'] = 'BMaGlass Pay couldn\'t start the payment. Please try again.';
                 }
             }
         }
@@ -110,14 +130,16 @@ class ControllerExtensionPaymentBmaglasspay extends Controller
     /**
      * Complete orders whose link has been paid — all pending orders,
      * or just the one for $link_code (the webhook path). Exactly
-     * once per order.
+     * once per order. Internal only (protected): it must not be
+     * reachable as a storefront route — only callback() calls it,
+     * after verifying the webhook signature.
      */
-    public function reconcile($link_code = null)
+    protected function reconcile($link_code = null)
     {
         $filter = $link_code !== null
             ? ' AND `link_code` = \'' . $this->db->escape($link_code) . '\''
             : '';
-        $rows = $this->db->query('SELECT `order_id`, `link_code` FROM `' . DB_PREFIX . 'bmaglasspay_orders` WHERE `paid` = 0' . $filter . ' LIMIT 50')->rows;
+        $rows = $this->db->query('SELECT `order_id`, `link_code` FROM `' . DB_PREFIX . 'bmaglasspay_orders` WHERE `paid` = 0' . $filter . ' ORDER BY `order_id` ASC LIMIT 50')->rows;
         if (!$rows) {
             return 0;
         }
