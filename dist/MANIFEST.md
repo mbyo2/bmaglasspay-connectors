@@ -278,8 +278,8 @@ Every zip carries install instructions: `INSTALL/README.md` at its root (store m
 
 ## bmaglasspay-sdk-flutter-1.0.0.zip
 
-- Size: 12263 bytes
-- SHA-256: `6711c4b90df2a4028a49df5a208b236ca161d042e1bd101c4531ce2c4c3ec0c2`
+- Size: 13889 bytes
+- SHA-256: `709b6a59a7bfc923b83b73984a073267082e9e9946120f29fe92a1befde23e48`
 - Download: https://hhxwwozpvgktuqutfkhc.supabase.co/storage/v1/object/public/downloads/bmaglasspay-sdk-flutter-1.0.0.zip
 - Install: Drop into your Flutter / Dart project (`bmaglass_sdk`)
 - Files (9):
@@ -295,8 +295,8 @@ Every zip carries install instructions: `INSTALL/README.md` at its root (store m
 
 ## bmaglasspay-sdk-php-1.0.0.zip
 
-- Size: 11994 bytes
-- SHA-256: `48819c6a34ecc1e27382bdf95c4addbc781e8c9df4f7aca1a775aed0e5261412`
+- Size: 13039 bytes
+- SHA-256: `1bc04cc36e5f105e59a6cd7e956b8bfd37dbf2046398d805549097655cda30bc`
 - Download: https://hhxwwozpvgktuqutfkhc.supabase.co/storage/v1/object/public/downloads/bmaglasspay-sdk-php-1.0.0.zip
 - Install: Drop `src/` into your project, or require via Composer (`bmaglass/bmaglass-sdk`)
 - Files (6):
@@ -309,8 +309,8 @@ Every zip carries install instructions: `INSTALL/README.md` at its root (store m
 
 ## bmaglasspay-sdk-python-1.0.0.zip
 
-- Size: 4837 bytes
-- SHA-256: `4c1090b0973806e713048e143f34a177298e3f9e86bcb2e398397a6f4d2c48c9`
+- Size: 5718 bytes
+- SHA-256: `0aa1910372254dd89cd2a419719aa97d72860ce4a1ad07ea37b70806e3dae225`
 - Download: https://hhxwwozpvgktuqutfkhc.supabase.co/storage/v1/object/public/downloads/bmaglasspay-sdk-python-1.0.0.zip
 - Install: Drop `bmaglass_sdk/` into your project (`bmaglass-sdk`)
 - Files (4):
@@ -321,8 +321,8 @@ Every zip carries install instructions: `INSTALL/README.md` at its root (store m
 
 ## bmaglasspay-sdk-react-native-1.0.0.zip
 
-- Size: 12372 bytes
-- SHA-256: `c9b33fc91e510eb9d58816a3b3ab61b1825e5c41e7fc25c62f9aacd3420cc988`
+- Size: 14171 bytes
+- SHA-256: `d62d940f88fb84eab60b8d2f63b97bc8af9fb7cc0aa374d3e54886f0e15b7b80`
 - Download: https://hhxwwozpvgktuqutfkhc.supabase.co/storage/v1/object/public/downloads/bmaglasspay-sdk-react-native-1.0.0.zip
 - Install: Drop into your React Native / Expo project (`@bmaglass/sdk-react-native`)
 - Files (7):
@@ -336,8 +336,8 @@ Every zip carries install instructions: `INSTALL/README.md` at its root (store m
 
 ## bmaglasspay-sdk-typescript-1.0.0.zip
 
-- Size: 14461 bytes
-- SHA-256: `6a9597f20aa114c003cca069dd116ae0a8d185f3b4f57208c4b30b90be067f8e`
+- Size: 17485 bytes
+- SHA-256: `11abb89cec6e12c53a71678a2c59db4b720c402e8f4be20ab5017539ba6b2b3e`
 - Download: https://hhxwwozpvgktuqutfkhc.supabase.co/storage/v1/object/public/downloads/bmaglasspay-sdk-typescript-1.0.0.zip
 - Install: Drop in / `npm install` from the package in the zip (`@bmaglass/sdk`)
 - Files (8):
