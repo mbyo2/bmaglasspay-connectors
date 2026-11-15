@@ -33,7 +33,7 @@ for f in Client.php ApiException.php; do
     for v in 1.7 8 9; do
         check_verbatim "integrations/prestashop/$v/bmaglasspay/classes/sdk" "$f"
     done
-    check_verbatim integrations/opencart/4.x/upload/system/library/bmaglass "$f"
+    check_verbatim integrations/opencart/4.x/upload/extension/bmaglasspay/system/library/bmaglass "$f"
     check_verbatim integrations/opencart/3.x/upload/system/library/bmaglass "$f"
     check_namespaced integrations/magento/BMaGlass/Pay/Model/Api "$f"
 done
