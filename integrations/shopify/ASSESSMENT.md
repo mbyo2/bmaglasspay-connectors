@@ -63,3 +63,19 @@ Use payment links + the embed now (zero approval, live today). If
 Shopify volume justifies it, BMaGlass files the payments-partner
 application as a business decision — that's a CEO/board action,
 not a coding task, so no code here pretends otherwise.
+
+## Re-verification (2026-11-15, ext-hunt workstream 5)
+
+Re-checked against Shopify's own documentation
+(shopify.dev/docs/apps/build/payments/payments-extension-review,
+read 2026-11-15): the payments platform is still invitation-only —
+a Payments Partner application review **and** a payments app review
+are both required before a payments extension can be approved, and
+a revenue-share agreement must be signed first. Nothing in the
+current requirements opens a code-only route to checkout, so the
+assessment above still holds, and there is still deliberately no
+Shopify package in this repo (no `bmaglasspay-shopify-*.zip` in
+`public/downloads.json`, no Shopify entry on the Developers page).
+"Generally Available" status — the point where a payments app
+becomes discoverable to all merchants — additionally needs at least
+50 stores using it and over $1,000,000 processed, per the same page.

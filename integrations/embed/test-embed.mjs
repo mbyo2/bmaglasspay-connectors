@@ -73,12 +73,36 @@ check('refusal is explained in console', dom.errors.some((e) => e.includes('must
 // 4. Foreign/phishing URL is refused.
 ph = { dataset: { link: 'https://evil.example/pay/ABC123' } };
 dom = run([ph]);
-check('foreign host refused', dom.created.length === 0 && dom.warnings.length === 1);
+check('foreign host refused', dom.created.length === 0 && dom.errors.length === 1);
+check('refusal is an error, not a warning', dom.warnings.length === 0);
 
 // 5. Non-HTTPS BMaGlass URL refused.
 ph = { dataset: { link: 'http://bmaglasspay.online/pay/ABC123' } };
 dom = run([ph]);
-check('http (not https) refused', dom.created.length === 0);
+check('http (not https) refused', dom.created.length === 0 && dom.errors.length === 1);
+
+// 6. An API key in data-label is refused too: the label is rendered as
+// visible button text, so a key there would leak onto the page.
+ph = { dataset: { link: 'https://bmaglasspay.online/pay/ABC123', label: 'Pay with bmg_live_supersecret' } };
+dom = run([ph]);
+check('API key in label refused', dom.created.length === 0 && dom.errors.length === 1);
+
+// 7. An API key in data-code is refused.
+ph = { dataset: { code: 'bmg_sandbox_supersecret' } };
+dom = run([ph]);
+check('API key in code refused', dom.created.length === 0 && dom.errors.length === 1);
+
+// 8. Whitespace-padded code still renders (trimmed); other targets
+// do not gain _blank/rel.
+ph = { dataset: { code: '  ABC123  ', target: '_self' } };
+dom = run([ph]);
+check('padded code renders trimmed', dom.created.length === 1 && dom.created[0].href === 'https://bmaglasspay.online/pay/ABC123');
+check('non-blank target sets nothing', dom.created[0].target === undefined && dom.created[0].rel === undefined);
+
+// 9. A link code with a slash in it cannot smuggle a path past the check.
+ph = { dataset: { code: 'ABC/def' } };
+dom = run([ph]);
+check('code with slash refused', dom.created.length === 0 && dom.errors.length === 1);
 
 console.log(failures === 0 ? '\nALL EMBED TESTS PASSED' : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

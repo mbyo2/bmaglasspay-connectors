@@ -13,7 +13,7 @@ BMaGlass webhooks fire for:
 |---|---|---|
 | `transaction.completed` | a transfer made **via the developer API** completes | `{transaction_id, amount, currency, to_user_id}` |
 | `payment_link.created` | a payment link is created (app or API) | the link row (`id`, `link_code`, `title`, `amount`, `currency`, `status`, `fee_payer`, `fee_amount`, `buyer_total`, `seller_receives`, `redirect_url`, `created_at`) |
-| `payment_link.paid` | a buyer **pays** a payment link (exactly once per settlement) | `{payment_link_id, link_code, title, amount, currency, fee_payer, fee_amount, total_charged, transaction_id, payer_transaction_id, payment_method, payment_count, total_collected, reference, metadata, settled_at}` |
+| `payment_link.paid` | a buyer **pays** a payment link (exactly once per settlement) | `{payment_link_id, link_code, title, amount, currency, fee_payer, fee_amount, total_charged, transaction_id, payer_transaction_id, payment_method, payment_count, total_collected, reference, metadata, settled_at}` — `total_charged` is what the buyer actually paid (price + fee when the buyer bears it); `reference`/`metadata` come from the link's `metadata` at creation, so set `metadata: {"reference": "Order #1042"}` when you create the link if your automation matches payments to orders. **Sandbox simulations emit this same shape** with `simulated: true`, `payment_method: "simulated"` and null transaction ids — a simulated payment is the way to teach a Zapier/Make hook the field names before any real payment arrives. |
 | `invoice.created` | an invoice is created via the developer API | the invoice row (`id`, `amount`, `currency`, `description`, `customer_email`, `status`, `environment`, `livemode`, `metadata`, `paid_at`, `created_at`) |
 | `invoice.paid` | a sandbox invoice is driven to paid through the simulate-payment endpoint (flagged `simulated: true`) | the invoice row with `status: "paid"` and `paid_at` set |
 | `mobile_money.collection.completed` | a mobile-money collection settles (exactly once per settlement) | `{reference, merchant_reference, collection_id, transaction_id, amount, base_amount, service_charge, fee_bearer, currency, operator, status, environment, settled_at}` |
@@ -49,7 +49,13 @@ use.
 3. Headers: `X-Api-Key: bmg_live_...` (legacy bmp_live_ keys work too; use a key scoped to
    `payment_links:write` only) and `Content-Type: application/json`.
 4. Body (JSON): `{"title": "...", "amount": 250, "currency": "ZMW"}`
-   — currencies are ZMW/USD only.
+   — currencies are ZMW/USD only. Pass `"fee_payer": "buyer"` to have
+   the buyer fund the 2.5% platform fee on top of the price (default
+   is the merchant's account setting), `"redirect_url":
+   "https://your-store.example/thanks"` to offer the buyer a Return
+   to store action after paying, and `"metadata": {"reference":
+   "Order #1042"}` so the `payment_link.paid` event carries your
+   order reference back to the automation.
 5. The response contains `link_code`; the buyer URL is
    `https://bmaglasspay.online/pay/<link_code>` — chain a Formatter
    step to build it and pass it to your next action (email, SMS…).
@@ -79,7 +85,13 @@ and point the webhook there.
 ## Zapier Platform app definition (DRAFT)
 
 `zapier/triggers-and-creates.json` in this folder is a **draft,
-unsubmitted** Zapier Platform-style definition of the trigger and
-create above, kept for a future formal submission. It is not
-published, not reviewed, and not needed for the recipes — the
-native modules are the supported path today.
+unsubmitted** Zapier Platform-style definition of the triggers and
+create above (six triggers: `transaction.completed`,
+`payment_link.created`, `payment_link.paid`, `invoice.created`,
+`invoice.paid`, `mobile_money.collection.completed` — `webhook.test`
+is intentionally not a trigger: it is the test ping you send to
+teach a hook, not a business event — and the create, with
+`fee_payer`, `redirect_url` and `reference` inputs), kept for a
+future formal submission. It is not published, not reviewed, and
+not needed for the recipes — the native modules are the supported
+path today.

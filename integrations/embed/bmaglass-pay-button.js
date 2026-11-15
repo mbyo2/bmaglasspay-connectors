@@ -41,7 +41,10 @@
 
     function render(placeholder) {
         var ds = placeholder.dataset || {};
-        var rawValues = [ds.link, ds.code];
+        // Every value that ends up in the page is checked — a key in
+        // data-label would be rendered as visible button text, which
+        // is just as much a leak as one in data-link.
+        var rawValues = [ds.link, ds.code, ds.label, ds.target];
         for (var i = 0; i < rawValues.length; i++) {
             if (looksLikeSecret(rawValues[i])) {
                 // Never render, never transmit. Keys are server-side only.
@@ -55,9 +58,12 @@
         }
         var url = linkFromDataset(ds);
         if (!LINK_RE.test(url)) {
+            // Error, not a warning: a bad link renders NOTHING — the
+            // placeholder stays an empty div — so a merchant who pasted
+            // a wrong URL needs this to be loud in the console.
             if (window.console) {
-                console.warn('[BMaGlass Pay] Skipping a pay button whose link is not a ' +
-                    'https://bmaglasspay.online/pay/<code> URL.');
+                console.error('[BMaGlass Pay] Not rendering a pay button: the link is not a ' +
+                    'https://bmaglasspay.online/pay/<code> URL. Check data-link / data-code.');
             }
             return;
         }
