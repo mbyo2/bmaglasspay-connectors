@@ -5,7 +5,9 @@ import logging
 from odoo import http
 from odoo.http import request
 
-from ..models.bmaglass_api import parse_webhook_event
+from odoo.exceptions import UserError
+
+from ..models.bmaglass_api import BMaGlassError, parse_webhook_event
 
 _logger = logging.getLogger(__name__)
 
@@ -63,7 +65,14 @@ class BMaGlassPayController(http.Controller):
                     if not settled:
                         # The event's checks declined it — verify against
                         # the API instead of trusting the payload further.
-                        tx._bmaglass_check_paid()
+                        # A missing key / refused key must not 500 a
+                        # verified delivery: the cron retries later.
+                        try:
+                            tx._bmaglass_check_paid()
+                        except (BMaGlassError, UserError) as e:
+                            _logger.warning(
+                                "BMaGlass API confirm failed for %s: %s",
+                                tx.reference, e.user_message() if isinstance(e, BMaGlassError) else e)
                 else:
                     _logger.info(
                         "BMaGlass payment_link.paid for unknown link %s.", link_code)
@@ -76,7 +85,10 @@ class BMaGlassPayController(http.Controller):
                 if tx:
                     # Opportunistic fast-path: the link exists; the cron
                     # remains the settler, this just checks a beat early.
-                    tx._bmaglass_check_paid()
+                    try:
+                        tx._bmaglass_check_paid()
+                    except (BMaGlassError, UserError):
+                        pass  # the cron retries; never 500 a verified delivery
         else:
             _logger.info("BMaGlass webhook event received: %s.", etype)
 

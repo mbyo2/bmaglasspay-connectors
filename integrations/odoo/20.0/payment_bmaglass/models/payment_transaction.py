@@ -437,6 +437,15 @@ class PaymentTransaction(models.Model):
             return True
         if self.state in ("cancel", "error"):
             return False
+        # The server only emits mobile_money.collection.completed for
+        # successful collections (dispatchMomoCollectionSettled returns
+        # early otherwise), but a failed status must never settle a
+        # transaction even if the event contract ever changes.
+        if str(data.get("status") or "").lower() not in ("", "successful"):
+            _logger.info(
+                "BMaGlass mobile_money.collection.completed declined for %s: "
+                "status is %s, not successful.", self.reference, data.get("status"))
+            return False
         ok, reason = momo_event_matches(
             data, self.reference, self.amount, self.currency_id.name)
         if not ok:

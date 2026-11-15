@@ -6,6 +6,8 @@ from odoo import http
 from odoo.http import request
 from odoo.addons.payment import utils as payment_utils
 
+from odoo.exceptions import UserError
+
 from ..models.bmaglass_api import BMaGlassError, parse_webhook_event
 
 _logger = logging.getLogger(__name__)
@@ -90,7 +92,14 @@ class BMaGlassPayController(http.Controller):
                     if not settled:
                         # The event's checks declined it — verify against
                         # the API instead of trusting the payload further.
-                        tx._bmaglass_check_paid()
+                        # A missing key / refused key must not 500 a
+                        # verified delivery: the cron retries later.
+                        try:
+                            tx._bmaglass_check_paid()
+                        except (BMaGlassError, UserError) as e:
+                            _logger.warning(
+                                "BMaGlass API confirm failed for %s: %s",
+                                tx.reference, e.user_message() if isinstance(e, BMaGlassError) else e)
                 else:
                     _logger.info(
                         "BMaGlass payment_link.paid for unknown link %s.", link_code)
@@ -109,7 +118,14 @@ class BMaGlassPayController(http.Controller):
                     if not settled:
                         # Declined cross-check or a failed collection —
                         # confirm against the API before anything moves.
-                        tx._bmaglass_momo_check_status()
+                        # A missing key / refused key must not 500 a
+                        # verified delivery: the cron retries later.
+                        try:
+                            tx._bmaglass_momo_check_status()
+                        except (BMaGlassError, UserError) as e:
+                            _logger.warning(
+                                "BMaGlass MoMo status check failed for %s: %s",
+                                tx.reference, e.user_message() if isinstance(e, BMaGlassError) else e)
                 else:
                     _logger.info(
                         "BMaGlass mobile_money.collection.completed for unknown "
@@ -123,7 +139,10 @@ class BMaGlassPayController(http.Controller):
                 if tx:
                     # Opportunistic fast-path: the link exists; the cron
                     # remains the settler, this just checks a beat early.
-                    tx._bmaglass_check_paid()
+                    try:
+                        tx._bmaglass_check_paid()
+                    except (BMaGlassError, UserError):
+                        pass  # the cron retries; never 500 a verified delivery
         else:
             _logger.info("BMaGlass webhook event received: %s.", etype)
 
@@ -151,6 +170,10 @@ class BMaGlassPayController(http.Controller):
             collection = tx._bmaglass_momo_create(phone, operator)
         except BMaGlassError as e:
             return self._json({"error": e.code, "message": e.user_message()}, status=400)
+        except UserError as e:
+            # No API key on the provider (or a malformed one): plain
+            # language for the buyer, never a 500.
+            return self._json({"error": "no_api_key", "message": str(e)}, status=400)
         return self._json({
             "reference": collection.get("reference"),
             "status": (collection.get("status") or "").lower(),
@@ -167,7 +190,11 @@ class BMaGlassPayController(http.Controller):
         if tx.state == "pending" and tx.bmaglass_momo_reference:
             # Poll-driven reconcile: the buyer is watching, so check the
             # rail now instead of waiting for the webhook or the cron.
-            tx._bmaglass_momo_check_status()
+            # A missing key / refused key just leaves the state as-is.
+            try:
+                tx._bmaglass_momo_check_status()
+            except (BMaGlassError, UserError):
+                pass
         return self._json({
             "state": tx.state,
             "state_message": tx.state_message or "",
