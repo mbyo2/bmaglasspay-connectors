@@ -23,6 +23,10 @@
                         (/payment/bmaglass/webhook) and stores the signing secret.
                         Enabling this provider requires a live key — BMaGlass test
                         keys use simulated money by design — checkout needs a production key.
+                        Mobile money is not available in this 16.0 module — Odoo 16.0
+                        has no payment method framework for a second method. Use the
+                        17.0 module or later for mobile money collections (ZMW only,
+                        live key, mobile money connected on the BMaGlass account).
                     </p>
                 </div>
             </xpath>

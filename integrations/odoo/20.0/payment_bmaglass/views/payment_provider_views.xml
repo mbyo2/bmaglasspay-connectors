@@ -27,6 +27,8 @@
                         (/payment/bmaglass/webhook) and stores the signing secret.
                         Enabling this provider requires a live key — BMaGlass test
                         keys use simulated money by design — checkout needs a production key.
+                        The Mobile Money method (17.0 and later) collects in ZMW only, on a
+                        live key, with mobile money connected on the BMaGlass account.
                     </p>
                 </div>
             </xpath>

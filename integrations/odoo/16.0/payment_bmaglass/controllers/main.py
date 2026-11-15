@@ -23,7 +23,12 @@ class BMaGlassPayController(http.Controller):
     event: it settles the matching payment transaction immediately
     (models/payment_transaction.py), with the reconciliation cron
     kept as the fallback for any missed delivery. Every verified
-    event is logged.
+    event is logged. A delivery whose link code is missing is ignored,
+    never matched against NULL-code transactions.
+
+    Odoo 16.0 has no payment.method framework, so this module offers
+    only the wallet method — there is no mobile-money flow here (see
+    the README); mobile money is available in 17.0 and later.
     """
 
     @http.route("/payment/bmaglass/webhook", type="http", auth="public",
@@ -47,25 +52,31 @@ class BMaGlassPayController(http.Controller):
         if etype == "webhook.test":
             _logger.info("BMaGlass webhook.test received and verified.")
         elif etype == "payment_link.paid":
-            tx = request.env["payment.transaction"].sudo().search(
-                [("bmaglass_link_code", "=", data.get("link_code"))], limit=1)
-            if tx:
-                settled = tx._bmaglass_settle_from_paid_event(data)
-                if not settled:
-                    # The event's checks declined it — verify against
-                    # the API instead of trusting the payload further.
-                    tx._bmaglass_check_paid()
+            link_code = data.get("link_code")
+            if not link_code:
+                _logger.warning("BMaGlass payment_link.paid without a link_code; ignored.")
             else:
-                _logger.info(
-                    "BMaGlass payment_link.paid for unknown link %s.", data.get("link_code"))
+                tx = request.env["payment.transaction"].sudo().search(
+                    [("bmaglass_link_code", "=", link_code)], limit=1)
+                if tx:
+                    settled = tx._bmaglass_settle_from_paid_event(data)
+                    if not settled:
+                        # The event's checks declined it — verify against
+                        # the API instead of trusting the payload further.
+                        tx._bmaglass_check_paid()
+                else:
+                    _logger.info(
+                        "BMaGlass payment_link.paid for unknown link %s.", link_code)
         elif etype == "payment_link.created":
             _logger.info("BMaGlass payment_link.created: link %s.", data.get("link_code"))
-            tx = request.env["payment.transaction"].sudo().search(
-                [("bmaglass_link_code", "=", data.get("link_code"))], limit=1)
-            if tx:
-                # Opportunistic fast-path: the link exists; the cron
-                # remains the settler, this just checks a beat early.
-                tx._bmaglass_check_paid()
+            link_code = data.get("link_code")
+            if link_code:
+                tx = request.env["payment.transaction"].sudo().search(
+                    [("bmaglass_link_code", "=", link_code)], limit=1)
+                if tx:
+                    # Opportunistic fast-path: the link exists; the cron
+                    # remains the settler, this just checks a beat early.
+                    tx._bmaglass_check_paid()
         else:
             _logger.info("BMaGlass webhook event received: %s.", etype)
 

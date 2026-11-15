@@ -140,6 +140,7 @@ class PaymentTransaction(models.Model):
         res = super()._get_specific_rendering_values(processing_values)
         if self.provider_code != "bmaglass":
             return res
+        res["bmaglass_momo"] = False  # the redirect template branches on this
         if self._bmaglass_is_momo():
             res.update({
                 "bmaglass_momo": True,
