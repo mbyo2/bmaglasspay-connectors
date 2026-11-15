@@ -8,7 +8,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "python"))
 
-from bmaglass_sdk import BMaGlass, BMaGlassError, verify_webhook_signature, parse_webhook_event
+from bmaglass_sdk import (BMaGlass, BMaGlassError, assert_supported_currency,
+                          payment_link_url, verify_webhook_signature, parse_webhook_event)
+import requests
 
 
 class FakeResponse:
@@ -27,7 +29,7 @@ class FakeSession:
         self.calls = []
 
     def request(self, method, url, headers=None, data=None, timeout=None):
-        self.calls.append({"method": method, "url": url, "headers": headers, "data": data})
+        self.calls.append({"method": method, "url": url, "headers": headers, "data": data, "timeout": timeout})
         if headers.get("X-Api-Key") not in ("bmp_test_contract", "bmg_sandbox_contract"):
             return FakeResponse(401, {"error": "invalid_api_key", "message": "nope"})
         if url.endswith("/connector/config"):
@@ -163,6 +165,74 @@ class SdkContractTest(unittest.TestCase):
         self.assertEqual(settings["platform_fee_percent"], 2.5)
         self.assertEqual(settings["paypal_platform_fee_percent"], 1)
         self.assertEqual(self.client.payment_links.attempts("link1")[0]["status"], "waiting")
+
+
+class ExtHuntFixesTest(unittest.TestCase):
+    """ext-hunt (2026-11-15): transport, encoding, client-side validation."""
+
+    def setUp(self):
+        self.session = FakeSession()
+        self.client = BMaGlass("bmp_test_contract", base_url="http://local.test", session=self.session)
+
+    def test_network_failure_is_typed(self):
+        class Boom(requests.Session):
+            def request(self, *a, **k):
+                raise requests.ConnectionError("boom")
+        client = BMaGlass("bmg_sandbox_x", base_url="http://local.test", session=Boom())
+        with self.assertRaises(BMaGlassError) as ctx:
+            client.wallets.list()
+        self.assertEqual((ctx.exception.status, ctx.exception.code), (0, "network_error"))
+
+    def test_timeout_is_sent_and_configurable(self):
+        self.client.wallets.list()
+        self.assertEqual(self.session.calls[-1].get("timeout"), 30)
+        fast = BMaGlass("bmg_sandbox_contract", base_url="http://local.test", session=self.session, timeout=5)
+        fast.wallets.list()
+        self.assertEqual(self.session.calls[-1].get("timeout"), 5)
+
+    def test_ids_are_url_encoded(self):
+        with self.assertRaises(BMaGlassError):
+            self.client.invoices.get("a/b")
+        self.assertTrue(self.session.calls[-1]["url"].endswith("/invoices/a%2Fb"))
+        with self.assertRaises(BMaGlassError):
+            self.client.payment_links.attempts("x/y")
+        self.assertTrue(self.session.calls[-1]["url"].endswith("/payment-links/x%2Fy/attempts"))
+        with self.assertRaises(BMaGlassError):
+            self.client.webhooks.test("w/z")
+        self.assertTrue(self.session.calls[-1]["url"].endswith("/webhooks/w%2Fz/test"))
+
+    def test_currency_guard_on_money_moves_only(self):
+        before = len(self.session.calls)
+        with self.assertRaises(BMaGlassError) as ctx:
+            self.client.transfers.create(to_user_id="u2", amount=10, currency="EUR")
+        self.assertEqual(ctx.exception.code, "unsupported_currency")
+        with self.assertRaises(BMaGlassError) as ctx:
+            self.client.payment_links.create("Euro", amount=10, currency="EUR")
+        self.assertEqual(ctx.exception.code, "unsupported_currency")
+        self.assertEqual(len(self.session.calls), before, "refused calls must not hit the network")
+        # Invoices are NOT guarded: the API accepts any 3-letter invoice currency.
+        self.client.invoices.create(10, currency="EUR")
+        self.assertEqual(json.loads(self.session.calls[-1]["data"])["currency"], "EUR")
+
+    def test_bad_side_is_refused(self):
+        with self.assertRaises(BMaGlassError) as ctx:
+            self.client.bitcoin.quote("bogus", amount_zmw=100)
+        self.assertEqual(ctx.exception.code, "invalid_side")
+        with self.assertRaises(BMaGlassError):
+            self.client.bitcoin.quote("selll", amount_sats=5000)
+
+    def test_transactions_limit_is_clamped(self):
+        self.client.transactions.list(0)
+        self.assertTrue(self.session.calls[-1]["url"].endswith("transactions?limit=1"))
+        self.client.transactions.list(500)
+        self.assertTrue(self.session.calls[-1]["url"].endswith("transactions?limit=100"))
+
+    def test_payment_link_url_helper(self):
+        self.assertEqual(payment_link_url("ABC123"), "https://bmaglasspay.online/pay/ABC123")
+        self.assertEqual(payment_link_url("a/b"), "https://bmaglasspay.online/pay/a%2Fb")
+        self.assertEqual(assert_supported_currency("zmw"), "ZMW")
+        with self.assertRaises(BMaGlassError):
+            assert_supported_currency("EUR")
 
 
 class WebhookVerifyTest(unittest.TestCase):

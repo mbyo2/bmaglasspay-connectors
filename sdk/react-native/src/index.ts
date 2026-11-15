@@ -59,10 +59,10 @@ export class BMaGlassError extends Error {
 
 export interface Wallet { id: string; currency: string; balance: number; status: string; created_at: string; updated_at: string }
 export interface Transaction { uuid_id: string; amount: number; currency: string; direction: string; status: string; description: string | null; recipient_name: string | null; fee_amount: number | null; created_at: string }
-export interface PaymentLink { id: string; title: string; description: string | null; amount: number | null; currency: string; link_code: string; status: string; payment_count: number; total_collected: number; expires_at: string | null; created_at: string; /** Who funds the platform fee on this link ("seller" | "buyer") — the merchant default from GET /settings unless overridden at creation. */ fee_payer?: "seller" | "buyer"; /** Buyer return URL offered by the hosted pay page after payment, when set. */ redirect_url?: string | null; /** Platform fee on the link amount (2.5% link rate), in the link currency. */ fee_amount?: number | null; /** What the buyer pays in total (amount + fee when fee_payer is "buyer"). */ buyer_total?: number | null; /** What the seller receives after the fee (amount − fee when fee_payer is "seller"). */ seller_receives?: number | null }
+export interface PaymentLink { id: string; title: string; description?: string | null; amount: number | null; currency: string; link_code: string; status: string; payment_count?: number; total_collected?: number; expires_at?: string | null; created_at: string; /** Who funds the platform fee on this link ("seller" | "buyer") — the merchant default from GET /settings unless overridden at creation. */ fee_payer?: "seller" | "buyer"; /** Buyer return URL offered by the hosted pay page after payment, when set. */ redirect_url?: string | null; /** Platform fee on the link amount (2.5% link rate), in the link currency. */ fee_amount?: number | null; /** What the buyer pays in total (amount + fee when fee_payer is "buyer"). */ buyer_total?: number | null; /** What the seller receives after the fee (amount − fee when fee_payer is "seller"). */ seller_receives?: number | null }
 export interface WebhookEndpoint { id: string; url: string; events: string[]; is_active: boolean; created_at: string; secret?: string }
 export interface WebhookDelivery { id: string; webhook_id: string; event_id: string; event_type: string; webhook_url: string; status: string; attempts: number; response_status: number | null; error_message: string | null; created_at: string }
-export interface MobileMoneyCollection { reference: string; merchant_reference: string | null; collection_id: string; transaction_id: string | null; amount: number; /** The product amount the 1% service charge is computed on — equals `amount` in seller mode. */ base_amount: number; /** The 1% service charge on the product amount (0 in seller mode). */ service_charge: number; /** Who pays the service charge ("seller" | "buyer"). */ fee_bearer: "seller" | "buyer"; currency: string; operator: "mtn" | "airtel" | "zamtel"; phone: string; status: "pending" | "successful" | "failed"; failure_reason: string | null; environment: "sandbox" | "production"; livemode: boolean; wallet_balance: number | null; settled_at: string | null; created_at: string }
+export interface MobileMoneyCollection { reference: string; merchant_reference: string | null; collection_id: string; transaction_id: string | null; amount: number; /** The product amount the 1% service charge is computed on — equals `amount` in seller mode. */ base_amount: number; /** The 1% service charge on the product amount — in BOTH modes (it is funded by the seller in seller mode and added to the buyer's total in buyer mode). */ service_charge: number; /** Who pays the service charge ("seller" | "buyer"). */ fee_bearer: "seller" | "buyer"; currency: string; operator: "mtn" | "airtel" | "zamtel"; phone: string; status: "pending" | "successful" | "failed"; failure_reason: string | null; environment: "sandbox" | "production"; livemode: boolean; wallet_balance: number | null; settled_at: string | null; created_at: string }
 
 export function paymentLinkUrl(linkCode: string): string {
   return `${SITE_BASE}/pay/${encodeURIComponent(linkCode)}`;
@@ -81,6 +81,11 @@ export interface BMaGlassOptions {
   apiKey: string;
   baseUrl?: string;
   fetchImpl?: typeof fetch;
+  /** Per-request timeout in milliseconds (default 30000). A request that
+   *  does not settle in time fails as a BMaGlassError with code
+   *  "network_error" instead of hanging forever. Implemented as a race
+   *  (not AbortSignal.timeout) because Hermes does not guarantee it. */
+  timeoutMs?: number;
 }
 
 export class BMaGlass {
@@ -91,6 +96,7 @@ export class BMaGlass {
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
+  private readonly timeoutMs: number;
 
   constructor(options: BMaGlassOptions) {
     if (!/^(bmg|bmp)_/.test(options.apiKey ?? "")) {
@@ -103,14 +109,42 @@ export class BMaGlass {
     const f = options.fetchImpl ?? (typeof fetch !== "undefined" ? fetch : undefined);
     if (!f) throw new BMaGlassError(0, "network_error", "No fetch implementation available; pass fetchImpl.");
     this.fetchImpl = f;
+    this.timeoutMs = options.timeoutMs ?? 30000;
   }
 
   private async request<T>(method: string, path: string, body?: unknown, headers: Record<string, string> = {}): Promise<T> {
-    const res = await this.fetchImpl(`${this.baseUrl}/${path}`, {
-      method,
-      headers: { "X-Api-Key": this.apiKey, "Content-Type": "application/json", ...headers },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    let res: Response;
+    try {
+      // Race against a timer: Hermes has no AbortSignal.timeout, and a
+      // fetch that never settles must not hang the app forever. (The
+      // underlying request is not cancelled on timeout — the platform
+      // fetch has no portable abort — but the caller gets its error.)
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(Object.assign(new Error("timeout"), { name: "TimeoutError" })), this.timeoutMs);
+      });
+      try {
+        res = await Promise.race([
+          this.fetchImpl(`${this.baseUrl}/${path}`, {
+            method,
+            headers: { "X-Api-Key": this.apiKey, "Content-Type": "application/json", ...headers },
+            body: body === undefined ? undefined : JSON.stringify(body),
+          }),
+          timeout,
+        ]);
+      } finally {
+        if (timer !== undefined) clearTimeout(timer);
+      }
+    } catch (e: any) {
+      // Transport failures (DNS, connection refused, timeout) used to
+      // leak out as raw TypeErrors. Every failure from this client is
+      // a typed BMaGlassError.
+      const timedOut = e?.name === "TimeoutError" || e?.name === "AbortError";
+      throw new BMaGlassError(0, "network_error",
+        timedOut
+          ? `BMaGlass Pay did not answer within ${this.timeoutMs}ms. Check the connection and try again.`
+          : `Couldn't reach BMaGlass Pay. Check the connection and try again. (${e?.message ?? e})`);
+    }
     const text = await res.text();
     let parsed: any = {};
     try { parsed = text ? JSON.parse(text) : {}; } catch { /* non-JSON */ }
@@ -124,11 +158,11 @@ export class BMaGlass {
   connectorConfig = () => this.request<Record<string, unknown>>("GET", "connector/config");
   invoices = {
     list: () => this.request<Record<string, unknown>[]>("GET", "invoices"),
-    get: (id: string) => this.request<Record<string, unknown>>("GET", `invoices/${id}`),
+    get: (id: string) => this.request<Record<string, unknown>>("GET", `invoices/${encodeURIComponent(id)}`),
     create: (input: { amount: number; currency?: string; description?: string; customer_email?: string }) =>
       this.request<Record<string, unknown>>("POST", "invoices", input),
     /** Sandbox only: drive a sandbox invoice to paid (fires invoice.paid, flagged simulated). */
-    simulatePayment: (id: string) => this.request<Record<string, unknown>>("POST", `invoices/${id}/simulate-payment`),
+    simulatePayment: (id: string) => this.request<Record<string, unknown>>("POST", `invoices/${encodeURIComponent(id)}/simulate-payment`),
   };
   wallets = {
     list: () => this.request<Wallet[]>("GET", "wallets"),
@@ -146,13 +180,17 @@ export class BMaGlass {
   paymentLinks = {
     list: () => this.request<PaymentLink[]>("GET", "payment-links"),
     /** Creates a link in the key's environment; sandbox links settle only by simulation. `fee_payer` overrides the merchant default from GET /settings for this link only ("seller" — the fee comes out of what the seller receives; "buyer" — the fee is added on top and the seller receives the full price). `redirect_url` is the buyer return URL the hosted pay page offers after payment. */
-    create: (input: { title: string; description?: string; amount?: number; currency?: string; expires_at?: string; fee_payer?: "seller" | "buyer"; redirect_url?: string }) =>
-      this.request<PaymentLink>("POST", "payment-links",
-        { ...input, currency: assertSupportedCurrency(input.currency ?? "ZMW") }),
+    create: (input: { title: string; description?: string; amount?: number; currency?: string; expires_at?: string; fee_payer?: "seller" | "buyer"; redirect_url?: string }) => {
+      if (input.fee_payer !== undefined && input.fee_payer !== "seller" && input.fee_payer !== "buyer") {
+        throw new BMaGlassError(0, "invalid_fee_payer", "fee_payer must be 'seller' or 'buyer'.");
+      }
+      return this.request<PaymentLink>("POST", "payment-links",
+        { ...input, currency: assertSupportedCurrency(input.currency ?? "ZMW") });
+    },
     /** A link's Bitcoin payment attempts (quote, sats received, status). */
-    attempts: (id: string) => this.request<unknown[]>("GET", `payment-links/${id}/attempts`),
+    attempts: (id: string) => this.request<unknown[]>("GET", `payment-links/${encodeURIComponent(id)}/attempts`),
     /** Sandbox only: mark one simulated payment on a sandbox link (fires payment_link.paid, flagged simulated). */
-    simulatePayment: (id: string) => this.request<Record<string, unknown>>("POST", `payment-links/${id}/simulate-payment`),
+    simulatePayment: (id: string) => this.request<Record<string, unknown>>("POST", `payment-links/${encodeURIComponent(id)}/simulate-payment`),
   };
   mobileMoney = {
     /**
@@ -178,16 +216,20 @@ export class BMaGlass {
   bitcoin = {
     balance: () => this.request<Array<{ asset: string; balance_sats: number; available_sats: number; updated_at: string }>>("GET", "bitcoin/balance"),
     depositAddress: () => this.request<{ address: string; derivation_path: string; is_active: boolean; created_at: string }>("GET", "bitcoin/deposit-address"),
-    /** Quote only — execution happens in the app. Works with sandbox keys. */
-    quote: (input: { side: "buy" | "sell"; amount_zmw?: number; amount_sats?: number }) =>
-      this.request<unknown>("POST", "bitcoin/quote", input),
+    /** Quote only — execution happens in the app. Works with sandbox keys. `side` must be "buy" or "sell": a typo here used to be silently treated as a buy quote, which flips the money direction. */
+    quote: (input: { side: "buy" | "sell"; amount_zmw?: number; amount_sats?: number }) => {
+      if (input.side !== "buy" && input.side !== "sell") {
+        throw new BMaGlassError(0, "invalid_side", "side must be 'buy' or 'sell'.");
+      }
+      return this.request<unknown>("POST", "bitcoin/quote", input);
+    },
   };
   webhooks = {
     list: () => this.request<WebhookEndpoint[]>("GET", "webhooks"),
     /** The returned secret is shown once — store it immediately. */
     create: (input: { url: string; events?: string[] }) => this.request<WebhookEndpoint>("POST", "webhooks", input),
-    remove: (id: string) => this.request<{ id: string; is_active: boolean }>("DELETE", `webhooks/${id}`),
-    test: (id: string) => this.request<unknown>("POST", `webhooks/${id}/test`),
+    remove: (id: string) => this.request<{ id: string; is_active: boolean }>("DELETE", `webhooks/${encodeURIComponent(id)}`),
+    test: (id: string) => this.request<unknown>("POST", `webhooks/${encodeURIComponent(id)}/test`),
     deliveries: () => this.request<WebhookDelivery[]>("GET", "webhook-deliveries"),
   };
 }

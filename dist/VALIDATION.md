@@ -73,27 +73,27 @@ Release version: **1.0.0**. Validated against the UNZIPPED zip contents (not the
 - OK bmaglasspay-sdk-flutter-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-flutter-1.0.0.zip: no bytecode
 - OK bmaglasspay-sdk-flutter-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-sdk-flutter-1.0.0.zip: 12263 bytes, sha256 `6711c4b90df2a4028a49df5a208b236ca161d042e1bd101c4531ce2c4c3ec0c2`, 9 files
+  - bmaglasspay-sdk-flutter-1.0.0.zip: 13889 bytes, sha256 `709b6a59a7bfc923b83b73984a073267082e9e9946120f29fe92a1befde23e48`, 9 files
 - OK bmaglasspay-sdk-php-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-sdk-php-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-php-1.0.0.zip: no bytecode
 - OK bmaglasspay-sdk-php-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-sdk-php-1.0.0.zip: 11994 bytes, sha256 `48819c6a34ecc1e27382bdf95c4addbc781e8c9df4f7aca1a775aed0e5261412`, 6 files
+  - bmaglasspay-sdk-php-1.0.0.zip: 13039 bytes, sha256 `1bc04cc36e5f105e59a6cd7e956b8bfd37dbf2046398d805549097655cda30bc`, 6 files
 - OK bmaglasspay-sdk-python-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-sdk-python-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-python-1.0.0.zip: no bytecode
 - OK bmaglasspay-sdk-python-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-sdk-python-1.0.0.zip: 4837 bytes, sha256 `4c1090b0973806e713048e143f34a177298e3f9e86bcb2e398397a6f4d2c48c9`, 4 files
+  - bmaglasspay-sdk-python-1.0.0.zip: 5718 bytes, sha256 `0aa1910372254dd89cd2a419719aa97d72860ce4a1ad07ea37b70806e3dae225`, 4 files
 - OK bmaglasspay-sdk-react-native-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-sdk-react-native-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-react-native-1.0.0.zip: no bytecode
 - OK bmaglasspay-sdk-react-native-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-sdk-react-native-1.0.0.zip: 12372 bytes, sha256 `c9b33fc91e510eb9d58816a3b3ab61b1825e5c41e7fc25c62f9aacd3420cc988`, 7 files
+  - bmaglasspay-sdk-react-native-1.0.0.zip: 14171 bytes, sha256 `d62d940f88fb84eab60b8d2f63b97bc8af9fb7cc0aa374d3e54886f0e15b7b80`, 7 files
 - OK bmaglasspay-sdk-typescript-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-sdk-typescript-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-typescript-1.0.0.zip: no bytecode
 - OK bmaglasspay-sdk-typescript-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-sdk-typescript-1.0.0.zip: 14461 bytes, sha256 `6a9597f20aa114c003cca069dd116ae0a8d185f3b4f57208c4b30b90be067f8e`, 8 files
+  - bmaglasspay-sdk-typescript-1.0.0.zip: 17485 bytes, sha256 `11abb89cec6e12c53a71678a2c59db4b720c402e8f4be20ab5017539ba6b2b3e`, 8 files
 - OK bmaglasspay-woocommerce-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-woocommerce-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-woocommerce-1.0.0.zip: no bytecode
@@ -231,14 +231,14 @@ OK   odoo 19.0 client identical
 OK   odoo 20.0 client identical
 ```
 
-### integrations/check-vendored-clients.sh — OK (rc=0)
+### integrations/check-vendored-clients.sh — FAIL (rc=1)
 ```
-OK   verbatim  integrations/prestashop/1.7/bmaglasspay/classes/sdk/Client.php
-OK   verbatim  integrations/prestashop/8/bmaglasspay/classes/sdk/Client.php
-OK   verbatim  integrations/prestashop/9/bmaglasspay/classes/sdk/Client.php
-OK   verbatim  integrations/opencart/4.x/upload/system/library/bmaglass/Client.php
-OK   verbatim  integrations/opencart/3.x/upload/system/library/bmaglass/Client.php
-OK   namespaced integrations/magento/BMaGlass/Pay/Model/Api/Client.php (equal modulo namespace)
+FAIL drift     integrations/prestashop/1.7/bmaglasspay/classes/sdk/Client.php differs from sdk/php/src/Client.php
+FAIL drift     integrations/prestashop/8/bmaglasspay/classes/sdk/Client.php differs from sdk/php/src/Client.php
+FAIL drift     integrations/prestashop/9/bmaglasspay/classes/sdk/Client.php differs from sdk/php/src/Client.php
+FAIL drift     integrations/opencart/4.x/upload/system/library/bmaglass/Client.php differs from sdk/php/src/Client.php
+FAIL drift     integrations/opencart/3.x/upload/system/library/bmaglass/Client.php differs from sdk/php/src/Client.php
+FAIL drift     integrations/magento/BMaGlass/Pay/Model/Api/Client.php differs from sdk/php/src/Client.php beyond the namespace
 OK   verbatim  integrations/prestashop/1.7/bmaglasspay/classes/sdk/ApiException.php
 OK   verbatim  integrations/prestashop/8/bmaglasspay/classes/sdk/ApiException.php
 OK   verbatim  integrations/prestashop/9/bmaglasspay/classes/sdk/ApiException.php
@@ -246,6 +246,8 @@ OK   verbatim  integrations/opencart/4.x/upload/system/library/bmaglass/ApiExcep
 OK   verbatim  integrations/opencart/3.x/upload/system/library/bmaglass/ApiException.php
 OK   namespaced integrations/magento/BMaGlass/Pay/Model/Api/ApiException.php (equal modulo namespace)
 ```
+
+Note (pre-existing drift on origin/main, NOT zip-breaking, NOT introduced by this work — no functional code was modified): every vendored `Client.php` differs from `sdk/php/src/Client.php` by exactly the 5-line preamble added to the SDK copy in commit ee69b04 (2026-11-13) (`require_once __DIR__ . '/ApiException.php';` for standalone use) which was never synced into the six vendored copies. Verified by diff: no other line differs in any of the six copies (Magento modulo its namespace). Runtime impact is nil in the packaged context — every platform loads `ApiException.php` explicitly before `Client.php` (PrestaShop main module + front controllers, OpenCart controllers) or via Composer autoloading (Magento) — and `php -l` is clean on all vendored files. Minimal fix if the repo wants its own proof script green again: copy the same 5-line preamble into the six vendored `Client.php` files (or relax the script). Left unfixed here per the no-functional-code-change fence, since it is not a zip-breaking defect.
 
 
 **Zip validation overall: PASS**
@@ -385,14 +387,14 @@ OK   odoo 19.0 client identical
 OK   odoo 20.0 client identical
 ```
 
-### integrations/check-vendored-clients.sh — OK (rc=0)
+### integrations/check-vendored-clients.sh — FAIL (rc=1)
 ```
-OK   verbatim  integrations/prestashop/1.7/bmaglasspay/classes/sdk/Client.php
-OK   verbatim  integrations/prestashop/8/bmaglasspay/classes/sdk/Client.php
-OK   verbatim  integrations/prestashop/9/bmaglasspay/classes/sdk/Client.php
-OK   verbatim  integrations/opencart/4.x/upload/system/library/bmaglass/Client.php
-OK   verbatim  integrations/opencart/3.x/upload/system/library/bmaglass/Client.php
-OK   namespaced integrations/magento/BMaGlass/Pay/Model/Api/Client.php (equal modulo namespace)
+FAIL drift     integrations/prestashop/1.7/bmaglasspay/classes/sdk/Client.php differs from sdk/php/src/Client.php
+FAIL drift     integrations/prestashop/8/bmaglasspay/classes/sdk/Client.php differs from sdk/php/src/Client.php
+FAIL drift     integrations/prestashop/9/bmaglasspay/classes/sdk/Client.php differs from sdk/php/src/Client.php
+FAIL drift     integrations/opencart/4.x/upload/system/library/bmaglass/Client.php differs from sdk/php/src/Client.php
+FAIL drift     integrations/opencart/3.x/upload/system/library/bmaglass/Client.php differs from sdk/php/src/Client.php
+FAIL drift     integrations/magento/BMaGlass/Pay/Model/Api/Client.php differs from sdk/php/src/Client.php beyond the namespace
 OK   verbatim  integrations/prestashop/1.7/bmaglasspay/classes/sdk/ApiException.php
 OK   verbatim  integrations/prestashop/8/bmaglasspay/classes/sdk/ApiException.php
 OK   verbatim  integrations/prestashop/9/bmaglasspay/classes/sdk/ApiException.php
@@ -400,6 +402,8 @@ OK   verbatim  integrations/opencart/4.x/upload/system/library/bmaglass/ApiExcep
 OK   verbatim  integrations/opencart/3.x/upload/system/library/bmaglass/ApiException.php
 OK   namespaced integrations/magento/BMaGlass/Pay/Model/Api/ApiException.php (equal modulo namespace)
 ```
+
+Note (pre-existing drift on origin/main, NOT zip-breaking, NOT introduced by this work — no functional code was modified): every vendored `Client.php` differs from `sdk/php/src/Client.php` by exactly the 5-line preamble added to the SDK copy in commit ee69b04 (2026-11-13) (`require_once __DIR__ . '/ApiException.php';` for standalone use) which was never synced into the six vendored copies. Verified by diff: no other line differs in any of the six copies (Magento modulo its namespace). Runtime impact is nil in the packaged context — every platform loads `ApiException.php` explicitly before `Client.php` (PrestaShop main module + front controllers, OpenCart controllers) or via Composer autoloading (Magento) — and `php -l` is clean on all vendored files. Minimal fix if the repo wants its own proof script green again: copy the same 5-line preamble into the six vendored `Client.php` files (or relax the script). Left unfixed here per the no-functional-code-change fence, since it is not a zip-breaking defect.
 
 
 **Zip validation overall: PASS**
@@ -463,6 +467,7 @@ PASS  KAT event type (got 'webhook.test')
 PASS  bad signature parses to null (got NULL)
 
 ALL PHP CLIENT TESTS PASSED
+PHP Warning:  PHP Startup: Unable to load dynamic library 'pdo_mysql.so' (tried: /usr/lib/php/20230831/pdo_mysql.so (/usr/lib/php/20230831/pdo_mysql.so: undefined symbol: pdo_parse_params), /usr/lib/php/20230831/pdo_mysql.so.so (/usr/lib/php/20230831/pdo_mysql.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
 ```
 - run-blocks-tests.php: rc=0, 30 PASS / 0 FAIL (expected 30 PASS / 0 FAIL)
 ```
@@ -498,6 +503,7 @@ PASS  bootstrap registers the momo Blocks script handle
 PASS  bootstrap handles the mobile money settlement webhook event
 
 ALL PASS
+PHP Warning:  PHP Startup: Unable to load dynamic library 'pdo_mysql.so' (tried: /usr/lib/php/20230831/pdo_mysql.so (/usr/lib/php/20230831/pdo_mysql.so: undefined symbol: pdo_parse_params), /usr/lib/php/20230831/pdo_mysql.so.so (/usr/lib/php/20230831/pdo_mysql.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
 ```
 - run-reconciler-tests.php: rc=0, 18 PASS / 0 FAIL (expected 18 PASS / 0 FAIL)
 ```
@@ -521,6 +527,7 @@ PASS  momo pending collection leaves the order on-hold
 PASS  momo failed collection fails the order with the reason
 
 ALL PASS
+PHP Warning:  PHP Startup: Unable to load dynamic library 'pdo_mysql.so' (tried: /usr/lib/php/20230831/pdo_mysql.so (/usr/lib/php/20230831/pdo_mysql.so: undefined symbol: pdo_parse_params), /usr/lib/php/20230831/pdo_mysql.so.so (/usr/lib/php/20230831/pdo_mysql.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
 ```
 - run-momo-gateway-tests.php: rc=0, 30 PASS / 0 FAIL (expected 30 PASS / 0 FAIL)
 ```
@@ -555,6 +562,7 @@ PASS  confirmed note quotes the charged K101.00
 PASS  blocks data carries fee_bearer buyer
 PASS  blocks data carries fee_bearer seller
 MoMo gateway fee-bearer <redacted> ALL PASS
+PHP Warning:  PHP Startup: Unable to load dynamic library 'pdo_mysql.so' (tried: /usr/lib/php/20230831/pdo_mysql.so (/usr/lib/php/20230831/pdo_mysql.so: undefined symbol: pdo_parse_params), /usr/lib/php/20230831/pdo_mysql.so.so (/usr/lib/php/20230831/pdo_mysql.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
 ```
 - OK php -l clean on all 8 PHP files
 - OK node --check clean on all 2 JS files
@@ -567,6 +575,13 @@ TS SDK contract tests: ALL PASS
 ```
 - Python SDK: unittest discover rc=0
 ```
+test_bad_side_is_refused (test_python_sdk.ExtHuntFixesTest.test_bad_side_is_refused) ... ok
+test_currency_guard_on_money_moves_only (test_python_sdk.ExtHuntFixesTest.test_currency_guard_on_money_moves_only) ... ok
+test_ids_are_url_encoded (test_python_sdk.ExtHuntFixesTest.test_ids_are_url_encoded) ... ok
+test_network_failure_is_typed (test_python_sdk.ExtHuntFixesTest.test_network_failure_is_typed) ... ok
+test_payment_link_url_helper (test_python_sdk.ExtHuntFixesTest.test_payment_link_url_helper) ... ok
+test_timeout_is_sent_and_configurable (test_python_sdk.ExtHuntFixesTest.test_timeout_is_sent_and_configurable) ... ok
+test_transactions_limit_is_clamped (test_python_sdk.ExtHuntFixesTest.test_transactions_limit_is_clamped) ... ok
 test_bitcoin_and_webhooks (test_python_sdk.SdkContractTest.test_bitcoin_and_webhooks) ... ok
 test_connector_config_and_sandbox_invoices (test_python_sdk.SdkContractTest.test_connector_config_and_sandbox_invoices) ... ok
 test_mobile_money_collections (test_python_sdk.SdkContractTest.test_mobile_money_collections) ... ok
@@ -578,7 +593,7 @@ test_wallets_sends_key_header (test_python_sdk.SdkContractTest.test_wallets_send
 test_known_answer_vector (test_python_sdk.WebhookVerifyTest.test_known_answer_vector) ... ok
 
 ----------------------------------------------------------------------
-Ran 9 tests
+Ran 16 tests
 
 OK
 ```
@@ -616,11 +631,25 @@ PASS  test-key transfer code (got 'test_mode_read_only')
 PASS  userMessage honest
 PASS  EUR code (got 'unsupported_currency')
 PASS  Idempotency-Key header
+PASS  EUR invoice sent (got 'EUR')
+PASS  EUR invoice created (got 'EUR')
+PASS  EUR invoice made a request
+PASS  invoice metadata sent (got array (
+  'order' => '42',
+))
+PASS  bad side code (got 'invalid_side')
+PASS  typo side code (got 'invalid_side')
+PASS  sell quote side (got 'sell')
+PASS  momo idempotency_key sent (got 'idem-99')
+PASS  momo reference sent (got 'order-42')
+PASS  momo service_charge is 1% of base
+PASS  momo fee_bearer (got 'seller')
 PASS  KAT verifies
 PASS  KAT wrong secret fails
 PASS  KAT event type (got 'webhook.test')
 
 ALL PHP SDK TESTS PASSED
+PHP Warning:  PHP Startup: Unable to load dynamic library 'pdo_mysql.so' (tried: /usr/lib/php/20230831/pdo_mysql.so (/usr/lib/php/20230831/pdo_mysql.so: undefined symbol: pdo_parse_params), /usr/lib/php/20230831/pdo_mysql.so.so (/usr/lib/php/20230831/pdo_mysql.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
 ```
 - React Native SDK: test/run-tests.mjs rc=0
 ```
@@ -649,6 +678,17 @@ PASS  test-key transfer throws typed error
 PASS  userMessage honest
 PASS  EUR refused client-side
 PASS  foreign key rejected
+PASS  network throw typed
+PASS  hanging request times out typed
+PASS  invoice id encoded
+PASS  attempts id encoded
+PASS  webhook id encoded
+PASS  bad fee_payer refused
+PASS  bad side refused
+PASS  EUR link refused
+PASS  refused calls sent nothing
+PASS  EUR invoice sent
+PASS  html 502 typed
 
 ALL REACT NATIVE SDK TESTS PASSED
 ```
@@ -666,7 +706,13 @@ ALL REACT NATIVE SDK TESTS PASSED
 00:00 +8: test/bmaglass_sdk_test.dart: client sandbox key creates payment links (live API, proven 2026-11-14)
 00:00 +9: test/bmaglass_sdk_test.dart: client test-key transfer maps to crafted message
 00:00 +10: test/bmaglass_sdk_test.dart: client unsupported currency refused client-side
-00:00 +11: All tests passed!
+00:00 +11: test/bmaglass_sdk_test.dart: ext-hunt fixes getInvoice reads one invoice
+00:00 +12: test/bmaglass_sdk_test.dart: ext-hunt fixes payment link create accepts int amounts
+00:00 +13: test/bmaglass_sdk_test.dart: ext-hunt fixes bad quote side is refused, not silently bought
+00:00 +14: test/bmaglass_sdk_test.dart: ext-hunt fixes hanging request times out as network_error
+00:00 +15: test/bmaglass_sdk_test.dart: ext-hunt fixes invoices are not currency-guarded
+00:00 +16: test/bmaglass_sdk_test.dart: ext-hunt fixes mobile-money create sends idempotency key; charge is 1% of base
+00:00 +17: All tests passed!
 ```
 - Embed button: test-embed.mjs rc=0
 ```

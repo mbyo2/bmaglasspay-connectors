@@ -53,9 +53,11 @@ $event = Client::parseWebhookEvent(file_get_contents('php://input'),
   simulation, and can register webhooks (sandbox endpoints receive sandbox
   events, including test deliveries). They can never move real money.
   Real-money writes fail with a typed `403 test_mode_read_only`.
-- **Currencies:** ZMW and USD — the currencies BMaGlass wallets
-  hold. Anything else throws `unsupported_currency`; no exchange
-  rate is ever invented.
+- **Currencies:** transfers and payment links are ZMW and USD — the
+  currencies BMaGlass wallets hold. Anything else throws
+  `unsupported_currency` on those calls; no exchange rate is ever
+  invented. Invoices are not guarded: the API accepts any 3-letter
+  invoice currency (a payment request, not a wallet move).
 - Webhook events that really occur today: `transaction.completed`
   (your own API transfers), `payment_link.created`,
   `payment_link.paid` (a payment link was paid — exactly once per

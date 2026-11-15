@@ -7,6 +7,7 @@
 // The webhook checks use the SHARED cross-SDK known-answer vector,
 // identical in the TS, Python, PHP, Odoo, WooCommerce and React
 // Native test suites.
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:bmaglass_sdk/bmaglass_sdk.dart';
@@ -47,6 +48,63 @@ http.Client stubClient() {
             'mode': 'test'
           }),
           200);
+    }
+    if (req.url.path.endsWith('/invoices/inv1') && req.method == 'GET') {
+      return http.Response(
+          jsonEncode({
+            'data': {'id': 'inv1', 'amount': 250, 'currency': 'ZMW', 'status': 'open', 'environment': 'sandbox'},
+            'mode': 'test'
+          }),
+          200);
+    }
+    if (req.url.path.endsWith('/invoices') && req.method == 'POST') {
+      final body = jsonDecode(req.body) as Map<String, dynamic>;
+      return http.Response(
+          jsonEncode({
+            'data': {'id': 'inv1', 'amount': body['amount'], 'currency': body['currency'] ?? 'ZMW', 'status': 'open', 'environment': 'sandbox'},
+            'mode': 'test'
+          }),
+          201);
+    }
+    if (req.url.path.endsWith('/mobile-money/collections') && req.method == 'POST') {
+      final body = jsonDecode(req.body) as Map<String, dynamic>;
+      final amount = (body['amount'] as num?)?.toDouble() ?? 0;
+      return http.Response(
+          jsonEncode({
+            'data': {
+              'reference': 'BMG-C1',
+              'merchant_reference': body['reference'],
+              'collection_id': 'col1',
+              'transaction_id': null,
+              'amount': body['amount'],
+              'base_amount': body['amount'],
+              // Live shape: service_charge is 1% of base_amount in BOTH
+              // modes (the seller funds it in seller mode; it is NOT 0).
+              'service_charge': (amount * 0.01 * 100).round() / 100,
+              'fee_bearer': 'seller',
+              'currency': 'ZMW',
+              'operator': body['operator'] ?? 'mtn',
+              'phone': body['phone'],
+              'status': 'pending',
+              'failure_reason': null,
+              'environment': 'sandbox',
+              'livemode': false,
+              'wallet_balance': null,
+              'settled_at': null,
+              'created_at': 't'
+            },
+            'mode': 'test'
+          }),
+          201);
+    }
+    if (req.url.path.endsWith('/bitcoin/quote') && req.method == 'POST') {
+      final body = jsonDecode(req.body) as Map<String, dynamic>;
+      return http.Response(
+          jsonEncode({
+            'data': {'id': 'q1', 'side': body['side']},
+            'mode': 'test'
+          }),
+          201);
     }
     if (req.url.path.endsWith('/payment-links') && req.method == 'POST') {
       // Sandbox keys CAN create payment links (settlement is simulation-only);
@@ -168,6 +226,72 @@ void main() {
       final client = BMaGlass(apiKey: 'bmp_live_contract', baseUrl: 'http://local.test', httpClient: stubClient());
       expect(() async => client.createPaymentLink(title: 'Euro', amount: 5, currency: 'EUR'),
           throwsA(predicate((e) => e is BMaGlassException && e.code == 'unsupported_currency')));
+    });
+  });
+
+  group('ext-hunt fixes', () {
+    test('getInvoice reads one invoice', () async {
+      final client = BMaGlass(apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', httpClient: stubClient());
+      final inv = await client.getInvoice('inv1');
+      expect(inv['status'], 'open');
+      expect(inv['amount'], 250);
+    });
+
+    test('payment link create accepts int amounts', () async {
+      // Regression: amount was `double?`, so an int variable did not
+      // compile ("The argument type 'int' can't be assigned to the
+      // parameter type 'double?'"). Sibling methods all take `num`.
+      final client = BMaGlass(apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', httpClient: stubClient());
+      final int amount = 10;
+      final link = await client.createPaymentLink(title: 'Order #10', amount: amount, currency: 'ZMW');
+      expect(link.amount, 10);
+      expect(link.linkCode, 'ABC123');
+    });
+
+    test('bad quote side is refused, not silently bought', () async {
+      final client = BMaGlass(apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', httpClient: stubClient());
+      expect(() async => client.bitcoinQuote(side: 'bogus', amountZmw: 100),
+          throwsA(predicate((e) => e is BMaGlassException && e.code == 'invalid_side')));
+      expect(() async => client.bitcoinQuote(side: 'selll', amountSats: 5000),
+          throwsA(predicate((e) => e is BMaGlassException && e.code == 'invalid_side')));
+      final q = await client.bitcoinQuote(side: 'sell', amountSats: 5000);
+      expect(q['side'], 'sell');
+    });
+
+    test('hanging request times out as network_error', () async {
+      // A future that never completes and sets no timer: the client's
+      // timeout must settle the call on its own.
+      final hanging = MockClient((req) => Completer<http.Response>().future);
+      final client = BMaGlass(
+          apiKey: 'bmp_test_contract',
+          baseUrl: 'http://local.test',
+          httpClient: hanging,
+          timeout: const Duration(milliseconds: 50));
+      try {
+        await client.wallets();
+        fail('should have thrown');
+      } on BMaGlassException catch (e) {
+        expect(e.code, 'network_error');
+        expect(e.status, 0);
+      }
+    });
+
+    test('invoices are not currency-guarded', () async {
+      // The API accepts any 3-letter invoice currency; the client used
+      // to refuse EUR invoices before any request was sent.
+      final client = BMaGlass(apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', httpClient: stubClient());
+      final inv = await client.createInvoice(amount: 10, currency: 'EUR', metadata: {'order': '42'});
+      expect(inv['currency'], 'EUR');
+    });
+
+    test('mobile-money create sends idempotency key; charge is 1% of base', () async {
+      final client = BMaGlass(apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', httpClient: stubClient());
+      final coll = await client.createMobileMoneyCollection(
+          amount: 100, phone: '0961111111', reference: 'order-42', idempotencyKey: 'idem-99');
+      expect(coll['merchant_reference'], 'order-42');
+      // Live shape: service_charge is 1% of base_amount in BOTH modes.
+      expect(coll['service_charge'], 1);
+      expect(coll['fee_bearer'], 'seller');
     });
   });
 }

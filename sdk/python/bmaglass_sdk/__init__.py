@@ -13,10 +13,31 @@ import hashlib
 import hmac
 import json
 from typing import Any, Optional
+from urllib.parse import quote
 
 import requests
 
 DEFAULT_BASE = "https://hhxwwozpvgktuqutfkhc.supabase.co/functions/v1/developer-api"
+SITE_BASE = "https://bmaglasspay.online"
+SUPPORTED_CURRENCIES = ("ZMW", "USD")
+
+
+def payment_link_url(link_code: str) -> str:
+    """Hosted payment page URL for a link code."""
+    return f"{SITE_BASE}/pay/{quote(link_code, safe='')}"
+
+
+def assert_supported_currency(currency: str) -> str:
+    """Guard: only currencies with wallets may move money (transfers,
+    payment links). Anything else is refused — never converted silently.
+    Invoices are NOT guarded: the API accepts any 3-letter invoice
+    currency (a payment request, not a wallet move)."""
+    c = str(currency or "").upper()
+    if c not in SUPPORTED_CURRENCIES:
+        raise BMaGlassError(0, "unsupported_currency",
+                            f"BMaGlass Pay wallets are ZMW and USD. This is {c or '?'}, which has no "
+                            "BMaGlass wallet — no exchange rate has been applied. Use ZMW or USD with BMaGlass Pay.")
+    return c
 
 
 class BMaGlassError(Exception):
@@ -28,7 +49,8 @@ class BMaGlassError(Exception):
 
 
 class BMaGlass:
-    def __init__(self, api_key: str, base_url: str = DEFAULT_BASE, session: Optional[requests.Session] = None):
+    def __init__(self, api_key: str, base_url: str = DEFAULT_BASE, session: Optional[requests.Session] = None,
+                 timeout: float = 30):
         if not api_key or not (api_key.startswith("bmg_") or api_key.startswith("bmp_")):
             raise BMaGlassError(0, "invalid_api_key", "api_key must be a BMaGlass Pay API key (bmg_live_..., bmg_sandbox_..., or a legacy bmp_ key).")
         self.api_key = api_key
@@ -36,6 +58,10 @@ class BMaGlass:
         self.environment = "production" if self.mode == "live" else "sandbox"
         self.base_url = base_url.rstrip("/")
         self.session = session or requests.Session()
+        # Per-request timeout in seconds (default 30). A request that
+        # does not settle in time fails as a typed BMaGlassError with
+        # code "network_error" instead of hanging forever.
+        self.timeout = timeout
         self.connector = _Connector(self)
         self.invoices = _Invoices(self)
         self.wallets = _Wallets(self)
@@ -51,8 +77,15 @@ class BMaGlass:
         hdrs = {"X-Api-Key": self.api_key, "Content-Type": "application/json"}
         if headers:
             hdrs.update(headers)
-        res = self.session.request(method, f"{self.base_url}/{path}", headers=hdrs,
-                                   data=json.dumps(body) if body is not None else None, timeout=30)
+        try:
+            res = self.session.request(method, f"{self.base_url}/{path}", headers=hdrs,
+                                       data=json.dumps(body) if body is not None else None, timeout=self.timeout)
+        except requests.RequestException as e:
+            # Transport failures (DNS, connection refused, timeout) used
+            # to leak out as raw requests exceptions. Every failure from
+            # this client is a typed BMaGlassError.
+            raise BMaGlassError(0, "network_error",
+                                f"Couldn't reach BMaGlass Pay. Check the connection and try again. ({e})") from e
         try:
             parsed = res.json() if res.text else {}
         except ValueError:
@@ -78,11 +111,11 @@ class _Connector:
 class _Invoices:
     def __init__(self, c: BMaGlass): self.c = c
     def list(self): return self.c._request("GET", "invoices")
-    def get(self, invoice_id: str): return self.c._request("GET", f"invoices/{invoice_id}")
+    def get(self, invoice_id: str): return self.c._request("GET", f"invoices/{quote(invoice_id, safe='')}")
     def create(self, amount: float, **kwargs): return self.c._request("POST", "invoices", {"amount": amount, **kwargs})
     def simulate_payment(self, invoice_id: str):
         """Sandbox only: drive a sandbox invoice to paid (fires invoice.paid, flagged simulated)."""
-        return self.c._request("POST", f"invoices/{invoice_id}/simulate-payment")
+        return self.c._request("POST", f"invoices/{quote(invoice_id, safe='')}/simulate-payment")
 
 
 class _Wallets:
@@ -92,7 +125,7 @@ class _Wallets:
 
 class _Transactions:
     def __init__(self, c: BMaGlass): self.c = c
-    def list(self, limit: int = 25): return self.c._request("GET", f"transactions?limit={limit}")
+    def list(self, limit: int = 25): return self.c._request("GET", f"transactions?limit={max(1, min(100, limit))}")
 
 
 class _Transfers:
@@ -100,7 +133,7 @@ class _Transfers:
     def create(self, to_user_id: str, amount: float, currency: str = "ZMW",
                description: Optional[str] = None, recipient_name: Optional[str] = None,
                idempotency_key: Optional[str] = None):
-        body = {"to_user_id": to_user_id, "amount": amount, "currency": currency}
+        body = {"to_user_id": to_user_id, "amount": amount, "currency": assert_supported_currency(currency)}
         if description is not None: body["description"] = description
         if recipient_name is not None: body["recipient_name"] = recipient_name
         headers = {"Idempotency-Key": idempotency_key} if idempotency_key else None
@@ -124,11 +157,13 @@ class _PaymentLinks:
             body["fee_payer"] = fee_payer
         if redirect_url is not None:
             body["redirect_url"] = redirect_url
+        if "currency" in body:
+            body["currency"] = assert_supported_currency(body["currency"])
         return self.c._request("POST", "payment-links", body)
-    def attempts(self, link_id: str): return self.c._request("GET", f"payment-links/{link_id}/attempts")
+    def attempts(self, link_id: str): return self.c._request("GET", f"payment-links/{quote(link_id, safe='')}/attempts")
     def simulate_payment(self, link_id: str):
         """Sandbox only: mark one simulated payment on a sandbox link (fires payment_link.paid, flagged simulated)."""
-        return self.c._request("POST", f"payment-links/{link_id}/simulate-payment")
+        return self.c._request("POST", f"payment-links/{quote(link_id, safe='')}/simulate-payment")
 
 
 class _MobileMoney:
@@ -162,7 +197,6 @@ class _MobileMoney:
         rail; a settled collection credits the business's ZMW wallet
         in full and fires mobile_money.collection.completed.
         Requires the mobile_money:read scope."""
-        from urllib.parse import quote
         return self.c._request("GET", f"mobile-money/collections/{quote(reference, safe='')}")
 
 
@@ -176,6 +210,8 @@ class _Bitcoin:
     def balance(self): return self.c._request("GET", "bitcoin/balance")
     def deposit_address(self): return self.c._request("GET", "bitcoin/deposit-address")
     def quote(self, side: str, amount_zmw: Optional[float] = None, amount_sats: Optional[float] = None):
+        if side not in ("buy", "sell"):
+            raise BMaGlassError(0, "invalid_side", "side must be 'buy' or 'sell'.")
         body: dict[str, Any] = {"side": side}
         if amount_zmw is not None: body["amount_zmw"] = amount_zmw
         if amount_sats is not None: body["amount_sats"] = amount_sats
@@ -189,8 +225,8 @@ class _Webhooks:
         body: dict[str, Any] = {"url": url}
         if events is not None: body["events"] = events
         return self.c._request("POST", "webhooks", body)
-    def remove(self, webhook_id: str): return self.c._request("DELETE", f"webhooks/{webhook_id}")
-    def test(self, webhook_id: str): return self.c._request("POST", f"webhooks/{webhook_id}/test")
+    def remove(self, webhook_id: str): return self.c._request("DELETE", f"webhooks/{quote(webhook_id, safe='')}")
+    def test(self, webhook_id: str): return self.c._request("POST", f"webhooks/{quote(webhook_id, safe='')}/test")
     def deliveries(self): return self.c._request("GET", "webhook-deliveries")
 
 
