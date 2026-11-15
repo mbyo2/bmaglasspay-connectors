@@ -19,3 +19,8 @@ verifyWebhookSignature(rawBody, req.headers["x-bmglass-signature"], webhookSecre
 
 Build: `npm install && npm run build` · Tests: `npm test` (contract tests in `../tests/`).
 Errors are `BMaGlassError` with `status` and `code` (e.g. `test_mode_read_only`).
+Transport failures and requests that exceed the 30s timeout (overridable
+via `timeoutMs`) also surface as `BMaGlassError` (`network_error`).
+Transfers and payment links accept ZMW and USD only (anything else throws
+`unsupported_currency`); invoices accept any 3-letter currency. Use
+`paymentLinkUrl(linkCode)` for the buyer-facing hosted pay page URL.
