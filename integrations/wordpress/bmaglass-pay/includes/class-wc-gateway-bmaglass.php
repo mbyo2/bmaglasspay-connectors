@@ -71,8 +71,9 @@ class WC_Gateway_BMaGlass extends WC_Payment_Gateway
             'api_key' => array(
                 'title' => 'API key',
                 'type' => 'password',
-                'description' => 'Create a key in BMaGlass Pay (Business settings or the API page) with the payment_links:write, '
-                    . 'wallets:read and webhooks:write scopes (webhooks:write is what lets this plugin register its webhook). '
+                'description' => 'Create a key in BMaGlass Pay (Business settings or the API page) with the payment_links:read, '
+                    . 'payment_links:write, wallets:read and webhooks:write scopes (webhooks:write is what lets this plugin register its webhook). '
+                    . 'For the Mobile Money gateway, the same key also needs mobile_money:create, mobile_money:read and config:read. '
                     . 'A production key (bmg_live_...) is required to take payments. A sandbox key '
                     . '(bmg_sandbox_...) runs the integration with simulated money — it can never move real money. '
                     . 'Older bmp_ keys keep working. The plugin configures itself from the key: paste it, test the '
@@ -192,8 +193,15 @@ class WC_Gateway_BMaGlass extends WC_Payment_Gateway
         }
 
         // Reuse an existing active link for this order (retries, double-clicks).
+        // Links expire 7 days after creation: reusing an expired one
+        // would send the buyer to a dead hosted page, so an expired
+        // link falls through and a fresh one is created below. Orders
+        // created before the expiry was stored carry no expiry meta
+        // (0) and keep the old behaviour — reuse — because the old
+        // link may still be active and payable.
         $existingCode = (string) $order->get_meta('_bmaglass_link_code');
-        if ($existingCode !== '') {
+        $existingExpires = (int) $order->get_meta('_bmaglass_link_expires');
+        if ($existingCode !== '' && ($existingExpires === 0 || $existingExpires > time() + 60)) {
             return array(
                 'result' => 'success',
                 'redirect' => BMaGlassClient::paymentLinkUrl($existingCode),
@@ -201,13 +209,14 @@ class WC_Gateway_BMaGlass extends WC_Payment_Gateway
         }
 
         $total = round((float) $order->get_total(), 2);
+        $linkExpires = time() + 7 * DAY_IN_SECONDS;
         try {
             $link = $client->createPaymentLink(
                 sprintf('Order #%s — %s', $order->get_order_number(), get_bloginfo('name')),
                 $total,
                 $currency,
                 sprintf('WooCommerce order %s', $order->get_order_key()),
-                gmdate('c', time() + 7 * DAY_IN_SECONDS),
+                gmdate('c', $linkExpires),
                 null,
                 // "Return to store" on the hosted pay page after payment.
                 $this->get_return_url($order)
@@ -218,8 +227,17 @@ class WC_Gateway_BMaGlass extends WC_Payment_Gateway
             return array('result' => 'failure');
         }
 
+        // A link without a code cannot be paid: fail here instead of
+        // redirecting the buyer to https://bmaglasspay.online/pay/.
+        if (!isset($link['link_code']) || (string) $link['link_code'] === '') {
+            $order->add_order_note('BMaGlass: payment link creation returned no link_code — checkout stopped, no redirect issued.');
+            wc_add_notice('BMaGlass Pay couldn\'t start this payment. Please try again or choose another payment method.', 'error');
+            return array('result' => 'failure');
+        }
+
         $order->update_meta_data('_bmaglass_link_id', isset($link['id']) ? $link['id'] : '');
         $order->update_meta_data('_bmaglass_link_code', isset($link['link_code']) ? $link['link_code'] : '');
+        $order->update_meta_data('_bmaglass_link_expires', $linkExpires);
         $order->update_meta_data('_bmaglass_payment_count_seen', 0);
         $order->update_status('on-hold', 'Awaiting BMaGlass Pay payment — link ' . (isset($link['link_code']) ? $link['link_code'] : '') . '.');
         $order->save();

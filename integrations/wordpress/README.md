@@ -33,16 +33,23 @@ WooCommerce 7.0 – 11.2** (11.2.1 is the current release, Oct 2026),
 bmaglass-pay/
   bmaglass-pay.php                       bootstrap: gateway registration, compatibility declarations, Blocks registration, webhook route, cron, admin actions
   includes/class-bmaglass-api-client.php framework-free developer-API client (seed of sdk/php)
-  includes/class-wc-gateway-bmaglass.php WC_Payment_Gateway implementation
+  includes/class-wc-gateway-bmaglass.php WC_Payment_Gateway implementation (hosted payment links)
+  includes/class-wc-gateway-bmaglass-momo.php WC_Payment_Gateway implementation (mobile money: MTN / Airtel / Zamtel)
   includes/class-bmaglass-reconciler.php settlement reconciliation (cron / thank-you / order action)
-  includes/class-bmaglass-blocks-integration.php  Checkout Blocks payment method type
+  includes/class-bmaglass-blocks-integration.php  Checkout Blocks payment method type (hosted links)
+  includes/class-bmaglass-momo-blocks-integration.php  Checkout Blocks payment method type (mobile money)
   assets/js/blocks-integration.js        Blocks registration script (no build step)
-  uninstall.php                          removes settings (API key + webhook secret) and the cron schedule
+  assets/js/momo-blocks-integration.js   Blocks registration script, mobile money (no build step)
+  uninstall.php                          removes both gateways' settings (API key + webhook secret), retires the webhook, clears the cron schedule
   readme.txt                             WordPress plugin readme
 tests/
   run-client-tests.php                   standalone PHP tests for the API client (no WordPress needed)
-  run-reconciler-tests.php               settlement logic tests (webhook path + polling fallback)
+  run-reconciler-tests.php               settlement logic tests (webhook path + polling fallback + 100-link cap)
   run-blocks-tests.php                   Blocks integration tests (stubbed Blocks base class)
+  run-momo-gateway-tests.php             Mobile Money gateway fee-bearer tests (stubbed WP/WC + API)
+  run-gateway-tests.php                  both gateways' process_payment paths (sandbox rules, link reuse/expiry, MoMo retry, phone normalisation)
+  run-webhook-tests.php                  the real webhook endpoint: HMAC, duplicates, unknown types, out-of-order delivery
+  run-uninstall-tests.php                uninstall: webhook retirement, both settings options, transient, cron
 ```
 
 ## Install
@@ -52,7 +59,9 @@ tests/
 2. WooCommerce → Settings → Payments → **BMaGlass Pay**: paste an API
    key created in BMaGlass Pay (Business settings or the API page)
    with scopes `wallets:read`, `payment_links:read`,
-   `payment_links:write`; enable and save.
+   `payment_links:write`, `webhooks:write` (plus `mobile_money:create`,
+   `mobile_money:read`, `config:read` for the Mobile Money gateway);
+   enable and save.
 3. **Test connection** — shows the account's wallets and whether the
    key is test or live.
 4. **Register webhook** — registers this site's endpoint
@@ -90,32 +99,70 @@ from it directly and reconciliation remains as the safety net.
   Settings + connection checks work with a sandbox key, and the
   connection check renders your connector configuration from BMaGlass
   (environment, business country, mobile-money availability for
-  businesses registered in Zambia); checkout refuses with a plain-language explanation.
+  businesses registered in Zambia). The hosted-link gateway refuses
+  sandbox checkout — the hosted pay page refuses sandbox links — but
+  mobile-money checkout runs end to end with a sandbox key against
+  the sandbox connection (test numbers; no real phone is ever
+  charged), including retries after a failed collection.
 - **Currencies:** ZMW and USD only — the currencies BMaGlass wallets
   hold. Other store currencies are refused at checkout with an
-  explanation; no exchange rate is ever invented.
-- Buyers need a BMaGlass Pay wallet to pay (guest card checkout is
+  explanation; no exchange rate is ever invented. Mobile money is
+  ZMW-only.
+- Buyers need a BMaGlass Pay wallet to pay the hosted link (guest card checkout is
   not a BMaGlass feature today).
+- **Reconciliation reads the 100 newest payment links.** `GET
+  /payment-links` returns max 100, newest first, and the API has no
+  single-link read — so on an account with more than 100 links the
+  polling fallback cannot confirm an older order's link, and the
+  order is flagged once instead of silently standing down. The
+  signed `payment_link.paid` webhook stays the primary settlement
+  path and is unaffected. A single-link read on the API side would
+  close this gap for good.
 
 ## Verification in this repo
 
-- `php -l` clean on all PHP files; the Blocks script passes
+- `php -l` clean on all PHP files; the Blocks scripts pass
   `node --check`.
-- `tests/run-client-tests.php` (PHP CLI, stub transport): mode
-  detection, header/body shaping, typed error mapping incl.
-  `test_mode_read_only`, currency guard, and the shared cross-SDK
-  HMAC known-answer vector.
-- `tests/run-reconciler-tests.php`: the `payment_link.paid` webhook
-  path and the polling fallback, incl. no-double-complete races.
-- `tests/run-blocks-tests.php`: the Blocks integration — name,
+- Seven mocked-WP suites, 239 checks, all passing (`php
+  integrations/wordpress/tests/run-*.php`, no WordPress or network):
+  `run-client-tests.php` (61: mode detection, header/body shaping,
+  typed error mapping incl. `test_mode_read_only`, revoked/expired/
+  under-scoped keys, non-JSON error bodies, currency guard, and the
+  shared cross-SDK HMAC known-answer vector);
+  `run-reconciler-tests.php` (24: the `payment_link.paid` webhook
+  path and the polling fallback, incl. no-double-complete races, the
+  mobile-money paths, the 100-link list cap, and the cron sweep with
+  a sandbox key);
+  `run-blocks-tests.php` (30: the Blocks integration — name,
   availability mirroring the classic gateway, payment-method data,
   script handle — plus source pins for the HPOS/Blocks
-  compatibility declarations in the bootstrap.
+  compatibility declarations in the bootstrap);
+  `run-momo-gateway-tests.php` (30: the Mobile Money gateway's
+  fee-bearer <redacted> — buyer K100 → K101 charged / seller nets
+  K100.00, seller K100 → K100.00 charged);
+  `run-gateway-tests.php` (47: both gateways' `process_payment`
+  paths — sandbox rules, link reuse/expiry, missing link code,
+  MoMo retry after failure, phone normalisation, feature-cache
+  behaviour);
+  `run-webhook-tests.php` (36: the real webhook endpoint — HMAC
+  verification, duplicates, tampered/missing signatures, malformed
+  payloads, unknown types, out-of-order delivery);
+  `run-uninstall-tests.php` (11: webhook retirement, both settings
+  options, feature transient, cron).
 - Live protocol proof: the plugin's own client class was run from
   PHP CLI against the production developer API (QA merchant account,
   live key): wallets read, payment link created and re-fetched,
   webhook registered and test event delivered (see the connectors
   addendum in the completion-sweep goal for the dated record).
+  The 2026-11-15 extensions hunt could NOT re-run live sandbox
+  collections: the developer API answered 429 `rate_limited` ("Too
+  many failed authentication attempts") to every QA key, including
+  the first call — a shared-bucket limit tripped before this
+  workstream's calls, treated as a hard stop, so the live sandbox
+  fee-bearer E2E (buyer K100 → K101 / seller nets K100.00; seller
+  K100 → K99 net) is still owed and must be re-run once the limiter
+  clears, with the fee-bearer QA merchant (qa-feebearer-zm) and the
+  sandbox test numbers.
 - **Install-tested 2026-10-26 on WordPress 7.1.3 + WooCommerce
   11.2.1 (HPOS): PASS** — Blocks and classic checkouts both paid
   end-to-end via signed webhook push; duplicate deliveries settle

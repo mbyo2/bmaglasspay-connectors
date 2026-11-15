@@ -32,6 +32,15 @@ $calls = array();
 $transport = function ($method, $url, $headers, $body) use (&$calls) {
     $calls[] = array('method' => $method, 'url' => $url, 'headers' => $headers, 'body' => $body);
     $flat = implode(' ', $headers);
+    if (strpos($flat, 'bmp_revoked_contract') !== false) {
+        return array(401, json_encode(array('error' => 'api_key_revoked', 'message' => 'revoked')));
+    }
+    if (strpos($flat, 'bmp_expired_contract') !== false) {
+        return array(401, json_encode(array('error' => 'api_key_expired', 'message' => 'expired')));
+    }
+    if (strpos($flat, 'bmp_noscope_contract') !== false) {
+        return array(403, json_encode(array('error' => 'insufficient_scope', 'message' => 'missing scope')));
+    }
     if (strpos($flat, 'bmp_test_contract') === false && strpos($flat, 'bmp_live_contract') === false) {
         return array(401, json_encode(array('error' => 'invalid_api_key', 'message' => 'nope')));
     }
@@ -94,6 +103,14 @@ $transport = function ($method, $url, $headers, $body) use (&$calls) {
             'livemode' => true, 'wallet_balance' => 142.5, 'settled_at' => '2026-11-12T00:01:00Z',
             'created_at' => '2026-11-12T00:00:00Z',
         ), 'mode' => 'live')));
+    }
+    if (str_ends_with($url, '/bitcoin/balance')) {
+        // An edge failure returns HTML, not JSON: the client must not
+        // crash and must not surface the raw body to the merchant.
+        return array(502, '<html>Bad Gateway</html>');
+    }
+    if (strpos($url, '/webhooks/wh1') !== false && $method === 'DELETE') {
+        return array(200, json_encode(array('data' => array(), 'mode' => 'live')));
     }
     return array(404, json_encode(array('error' => 'not_found', 'message' => 'no route')));
 };
@@ -218,6 +235,52 @@ check('KAT tampered body fails', !BMaGlassClient::verifyWebhookSignature($raw . 
 $event = BMaGlassClient::parseWebhookEvent($raw, $sig, 'whsec_testsecret');
 eq('KAT event type', $event['type'], 'webhook.test');
 eq('bad signature parses to null', BMaGlassClient::parseWebhookEvent($raw, 'sha256=deadbeef', 'whsec_testsecret'), null);
+
+// ── Revoked / expired / under-scoped keys ───────────────────────────
+try {
+    (new BMaGlassClient('bmp_revoked_contract', 'http://local.test', $transport))->wallets();
+    check('revoked key throws', false);
+} catch (BMaGlassApiException $e) {
+    eq('revoked key code', $e->errorCode, 'api_key_revoked');
+    eq('revoked key status', $e->status, 401);
+    check('revoked key message is plain language', strpos($e->userMessage(), "wasn't accepted") !== false);
+}
+try {
+    (new BMaGlassClient('bmp_expired_contract', 'http://local.test', $transport))->wallets();
+    check('expired key throws', false);
+} catch (BMaGlassApiException $e) {
+    eq('expired key code', $e->errorCode, 'api_key_expired');
+    check('expired key message is plain language', strpos($e->userMessage(), "wasn't accepted") !== false);
+}
+try {
+    (new BMaGlassClient('bmp_noscope_contract', 'http://local.test', $transport))->wallets();
+    check('under-scoped key throws', false);
+} catch (BMaGlassApiException $e) {
+    eq('under-scoped key code', $e->errorCode, 'insufficient_scope');
+    check('under-scoped key message names the permission problem', strpos($e->userMessage(), 'permission') !== false);
+}
+
+// ── Non-JSON error bodies + network failures ─────────────────────────
+try {
+    $live->bitcoinBalance();
+    check('HTML 502 throws', false);
+} catch (BMaGlassApiException $e) {
+    eq('HTML 502 status', $e->status, 502);
+    eq('HTML 502 code', $e->errorCode, 'request_failed');
+    check('HTML 502 message is generic (no raw body)', strpos($e->userMessage(), '<html>') === false
+        && strpos($e->userMessage(), 'HTTP 502') !== false);
+}
+
+// A network failure's user-facing message must never carry the raw
+// curl/system detail (the stored message keeps it for order notes).
+$netErr = new BMaGlassApiException(0, 'network_error',
+    'Couldn\'t reach BMaGlass Pay. Check the connection and try again. (Connection timed out)');
+check('network_error message hides the curl detail', strpos($netErr->userMessage(), 'timed out') === false
+    && strpos($netErr->userMessage(), 'couldn\'t be reached') !== false);
+
+// ── Webhook deletion ─────────────────────────────────────────────────
+$deleted = $live->deleteWebhook('wh1');
+check('webhook delete returns', is_array($deleted));
 
 echo $failures === 0 ? "\nALL PHP CLIENT TESTS PASSED\n" : "\n$failures FAILURE(S)\n";
 exit($failures === 0 ? 0 : 1);
