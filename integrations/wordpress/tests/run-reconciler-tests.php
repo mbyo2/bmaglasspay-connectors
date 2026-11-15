@@ -127,6 +127,11 @@ function wc_get_orders($args)
 function paid_link_client()
 {
     $transport = function ($method, $url, $headers, $body) {
+        if (str_ends_with($url, '/payment-links/LK1') && $method === 'GET') {
+            return array(200, json_encode(array('data' => array(
+                'id' => 'pl1', 'link_code' => 'LK1', 'payment_count' => 1, 'total_collected' => 5,
+            ), 'mode' => 'live')));
+        }
         if (str_ends_with($url, '/payment-links') && $method === 'GET') {
             return array(200, json_encode(array('data' => array(
                 array('id' => 'pl1', 'link_code' => 'LK1', 'payment_count' => 1, 'total_collected' => 5),
@@ -266,6 +271,11 @@ check('momo failed collection fails the order with the reason',
 function capped_link_client($includePaidLK1)
 {
     $transport = function ($method, $url, $headers, $body) use ($includePaidLK1) {
+        if (str_ends_with($url, '/payment-links/LK1') && $method === 'GET') {
+            // Direct read unavailable (older API): the reconciler falls
+            // back to the list, which is where the cap bites.
+            return array(500, json_encode(array('error' => 'request_failed', 'message' => 'boom')));
+        }
         if (str_ends_with($url, '/payment-links') && $method === 'GET') {
             $links = array();
             if ($includePaidLK1) {
@@ -304,6 +314,59 @@ check('capped list: a paid link inside the 100 still completes',
     BMaGlass_Reconciler::reconcile_order($order, capped_link_client(true)) === true
     && $order->complete_calls === 1);
 
+// ── Direct single-link read: GET /payment-links/{id} ────────────────
+// A link older than the 100 newest is verifiable directly, so the cap
+// no longer blocks reconciliation when the endpoint answers.
+function direct_link_client()
+{
+    $transport = function ($method, $url, $headers, $body) {
+        if (str_ends_with($url, '/payment-links/LK1') && $method === 'GET') {
+            return array(200, json_encode(array('data' => array(
+                'id' => 'pl1', 'link_code' => 'LK1', 'payment_count' => 1, 'total_collected' => 5,
+            ), 'mode' => 'live')));
+        }
+        if (str_ends_with($url, '/payment-links') && $method === 'GET') {
+            // 100 newest rows, LK1 absent — the old code could never
+            // verify this order from the list alone.
+            $links = array();
+            for ($i = 2; $i <= 101; $i++) {
+                $links[] = array('id' => 'pl' . $i, 'link_code' => 'LK' . $i, 'payment_count' => 0, 'total_collected' => 0);
+            }
+            return array(200, json_encode(array('data' => $links, 'mode' => 'live')));
+        }
+        return array(404, json_encode(array('error' => 'not_found', 'message' => 'no route')));
+    };
+    return new BMaGlassClient('bmp_live_reconciler_test', null, $transport);
+}
+
+$order = fresh_order();
+check('direct read: a paid link beyond the 100-list completes',
+    BMaGlass_Reconciler::reconcile_order($order, direct_link_client()) === true
+    && $order->complete_calls === 1);
+
+function direct_404_client()
+{
+    $transport = function ($method, $url, $headers, $body) {
+        // Direct read 404s (link does not belong to this key); the
+        // list fallback is never reached for a 404, so no cap warning.
+        if (str_ends_with($url, '/payment-links') && $method === 'GET') {
+            $links = array();
+            for ($i = 2; $i <= 101; $i++) {
+                $links[] = array('id' => 'pl' . $i, 'link_code' => 'LK' . $i, 'payment_count' => 0, 'total_collected' => 0);
+            }
+            return array(200, json_encode(array('data' => $links, 'mode' => 'live')));
+        }
+        return array(404, json_encode(array('error' => 'not_found', 'message' => 'no route')));
+    };
+    return new BMaGlassClient('bmp_live_reconciler_test', null, $transport);
+}
+
+$order = fresh_order();
+check('direct read 404: order is NOT completed and gets no cap warning',
+    BMaGlass_Reconciler::reconcile_order($order, direct_404_client()) === false
+    && $order->complete_calls === 0
+    && strpos(implode(' ', $order->notes), '100') === false);
+
 // ── Cron sweep: no environment gate ──────────────────────────────────
 // reconcile_pending() runs for the key's own environment: a sandbox
 // key reconciles its sandbox mobile-money orders (whose checkout
@@ -325,6 +388,11 @@ class FakeBmaglassGateway
 function sandbox_cron_client()
 {
     $transport = function ($method, $url, $headers, $body) {
+        if (str_ends_with($url, '/payment-links/LK1') && $method === 'GET') {
+            return array(200, json_encode(array('data' => array(
+                'id' => 'pl1', 'link_code' => 'LK1', 'payment_count' => 1, 'total_collected' => 5,
+            ), 'mode' => 'test')));
+        }
         if (str_ends_with($url, '/payment-links') && $method === 'GET') {
             return array(200, json_encode(array('data' => array(
                 array('id' => 'pl1', 'link_code' => 'LK1', 'payment_count' => 1, 'total_collected' => 5),

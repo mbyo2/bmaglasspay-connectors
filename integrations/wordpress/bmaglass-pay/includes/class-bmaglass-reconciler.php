@@ -27,15 +27,35 @@ class BMaGlass_Reconciler
 {
     /**
      * Fetch the payment-link row for an order, or null. Also reports
-     * whether the list hit the API's 100-row cap (GET /payment-links
-     * returns max 100, newest first): when capped and the code is not
-     * in the list, the link may simply be older than the 100 newest —
-     * "not found" is inconclusive, not "unpaid".
+     * whether the list fallback hit the API's 100-row cap (GET
+     * /payment-links returns max 100, newest first): when capped and
+     * the code is not in the list, the link may simply be older than
+     * the 100 newest — "not found" is inconclusive, not "unpaid".
+     *
+     * The direct read (GET /payment-links/{id}, by link code) runs
+     * first, so a link older than the 100 newest is still verifiable.
+     * A 404 from the direct read is authoritative — the link does not
+     * belong to this key — and never produces the cap warning. Any
+     * other failure falls back to the list, preserving the old
+     * behaviour including the cap warning.
      *
      * @return array{link: array|null, capped: bool}
      */
     private static function fetch_link(BMaGlassClient $client, $linkCode)
     {
+        try {
+            $link = $client->getPaymentLink($linkCode);
+            if (is_array($link) && isset($link['link_code'])) {
+                return array('link' => $link, 'capped' => false);
+            }
+            return array('link' => null, 'capped' => false);
+        } catch (BMaGlassApiException $e) {
+            if ($e->status === 404) {
+                return array('link' => null, 'capped' => false);
+            }
+            // Any other failure (network, 5xx) falls through to the
+            // list below, preserving the old behaviour incl. the cap.
+        }
         $links = $client->listPaymentLinks();
         if (!is_array($links)) {
             return array('link' => null, 'capped' => false);

@@ -245,6 +245,18 @@ if (!class_exists('BMaGlassClient')) {
         }
 
         /**
+         * GET /payment-links/{id} — one link by UUID id or link_code.
+         * The list endpoint caps at 100 (newest first), so a reconciler
+         * verifying an older link reads it directly instead. Throws a
+         * BMaGlassApiException (404 not_found) when the link does not
+         * belong to this key's owner/environment.
+         */
+        public function getPaymentLink($idOrCode)
+        {
+            return $this->request('GET', 'payment-links/' . rawurlencode((string) $idOrCode));
+        }
+
+        /**
          * POST /payment-links — create a hosted payment link in the
          * key's environment (sandbox links settle only by simulation).
          * Returns the row including link_code; the buyer-facing

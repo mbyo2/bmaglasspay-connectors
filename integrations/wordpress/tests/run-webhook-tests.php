@@ -108,6 +108,10 @@ class BMaGlassClient
     {
         return $this->call('listPaymentLinks', null);
     }
+    public function getPaymentLink($idOrCode)
+    {
+        return $this->call('getPaymentLink', $idOrCode);
+    }
     public function getMobileMoneyCollection($reference)
     {
         return $this->call('getMobileMoneyCollection', $reference);
@@ -327,6 +331,9 @@ function setup($secret = 'whsec_testsecret') {
     $GLOBALS['api_calls'] = array();
     $GLOBALS['client_script'] = function ($op, $arg) {
         // Fallback reconciliation: the link is unpaid.
+        if ($op === 'getPaymentLink') {
+            return array('id' => 'pl1', 'link_code' => 'LK1', 'payment_count' => 0, 'total_collected' => 0);
+        }
         if ($op === 'listPaymentLinks') {
             return array(array('id' => 'pl1', 'link_code' => 'LK1', 'payment_count' => 0, 'total_collected' => 0));
         }
