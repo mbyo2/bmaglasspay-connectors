@@ -126,10 +126,13 @@ class WC_Gateway_BMaGlass_Mobile_Money extends WC_Payment_Gateway
             $config = $client->connectorConfig();
             $mm = isset($config['features']['mobile_money']) && is_array($config['features']['mobile_money'])
                 ? $config['features']['mobile_money'] : array();
+            // Cache only a successful read: caching the empty array
+            // from a failed read would hide the gateway for 5 minutes
+            // after a transient API blip.
+            set_transient($cacheKey, $mm, 5 * MINUTE_IN_SECONDS);
         } catch (BMaGlassApiException $e) {
             $mm = array();
         }
-        set_transient($cacheKey, $mm, 5 * MINUTE_IN_SECONDS);
         return $mm;
     }
 
@@ -257,6 +260,30 @@ class WC_Gateway_BMaGlass_Mobile_Money extends WC_Payment_Gateway
         return 'woo-order-' . $order_id;
     }
 
+    /** Merchant reference for a retry after a failed collection. */
+    public static function retry_merchant_reference($order_id, $attempt)
+    {
+        return 'woo-order-' . $order_id . '-retry-' . (int) $attempt;
+    }
+
+    /**
+     * Normalise a buyer-typed mobile money number to the national
+     * digit format the rail expects: drop spaces, dashes, brackets
+     * and dots, and convert the +260 / 260 country prefix to the
+     * leading 0. The checkout placeholder shows "0977 123 456", so
+     * a spaced number must not reach the API verbatim.
+     */
+    public static function normalize_phone($phone)
+    {
+        $p = preg_replace('/[\s\-\(\)\.]+/', '', (string) $phone);
+        if (strpos($p, '+260') === 0) {
+            $p = '0' . substr($p, 4);
+        } elseif (strpos($p, '260') === 0 && strlen($p) === 12) {
+            $p = '0' . substr($p, 3);
+        }
+        return $p;
+    }
+
     /**
      * Start the collection for the order and park it on-hold until
      * the buyer approves the prompt on their phone.
@@ -276,32 +303,59 @@ class WC_Gateway_BMaGlass_Mobile_Money extends WC_Payment_Gateway
             wc_add_notice('Mobile money payments are in Zambian kwacha (ZMW). Please choose another payment method for this order.', 'error');
             return array('result' => 'failure');
         }
-        // Honest sandbox refusal, mirroring the main gateway: a
-        // sandbox key runs on simulated money and can never charge a
-        // real phone, so real checkout refuses up front.
-        if (!$client->isLive()) {
-            wc_add_notice(
-                'This store\'s BMaGlass key is a sandbox key, which can\'t take real payments. The store owner needs to '
-                . 'switch to a production BMaGlass key before checkout can run.',
-                'error'
-            );
-            return array('result' => 'failure');
-        }
-
-        $phone = isset($_POST['bmaglass_momo_phone']) ? sanitize_text_field(wp_unslash($_POST['bmaglass_momo_phone'])) : '';
+        // Sandbox keys CAN check out by mobile money: a sandbox key
+        // runs against the merchant's sandbox mobile-money connection
+        // (the gateway's test numbers), so no real phone is ever
+        // charged. This is unlike the hosted-link gateway, whose
+        // sandbox links the hosted pay page refuses — that refusal
+        // stays in place there.
+        $phone = self::normalize_phone(isset($_POST['bmaglass_momo_phone']) ? sanitize_text_field(wp_unslash($_POST['bmaglass_momo_phone'])) : '');
         $operator = isset($_POST['bmaglass_momo_operator']) ? sanitize_text_field(wp_unslash($_POST['bmaglass_momo_operator'])) : '';
         if (!in_array($operator, array('mtn', 'airtel', 'zamtel'), true)) {
             $operator = null;
         }
 
         // Retry / double-click guard: a collection already started
-        // for this order is never started twice — the buyer just
-        // goes back to the thank-you page to approve it.
-        if ((string) $order->get_meta('_bmaglass_momo_reference') !== '') {
-            return array(
-                'result' => 'success',
-                'redirect' => $this->get_return_url($order),
-            );
+        // for this order is never started twice while it is pending
+        // (the buyer may still approve the prompt) — the buyer just
+        // goes back to the thank-you page to approve it. But a
+        // collection that TERMINALLY FAILED leaves the order failed
+        // with no way back, so a retry starts a FRESH collection
+        // under a FRESH merchant reference: the API's idempotency key
+        // is the merchant reference, and replaying the failed
+        // reference would return the failed collection (or 409).
+        $merchantReference = self::merchant_reference($order_id);
+        $existingReference = (string) $order->get_meta('_bmaglass_momo_reference');
+        $attempt = 0;
+        if ($existingReference !== '') {
+            $existing = null;
+            $existingGone = false;
+            try {
+                $existing = $client->getMobileMoneyCollection($existingReference);
+            } catch (BMaGlassApiException $e) {
+                // The server no longer knows this reference: there is
+                // nothing to conflict with, so recreate under the
+                // original reference below. Any other failure (e.g.
+                // network) must NOT start a second collection blindly.
+                $existingGone = $e->errorCode === 'not_found';
+                $existing = null;
+            }
+            if (!$existingGone && (!is_array($existing) || !isset($existing['status']) || $existing['status'] !== 'failed')) {
+                return array(
+                    'result' => 'success',
+                    'redirect' => $this->get_return_url($order),
+                );
+            }
+            if (!$existingGone) {
+                // The attempt number is only persisted once the new
+                // collection is actually created (below): a create
+                // that fails must not consume a reference number.
+                $attempt = (int) $order->get_meta('_bmaglass_momo_attempts') + 1;
+                if ($attempt < 2) {
+                    $attempt = 2;
+                }
+                $merchantReference = self::retry_merchant_reference($order_id, $attempt);
+            }
         }
 
         $total = round((float) $order->get_total(), 2);
@@ -310,7 +364,7 @@ class WC_Gateway_BMaGlass_Mobile_Money extends WC_Payment_Gateway
                 $total,
                 $phone,
                 $operator,
-                self::merchant_reference($order_id)
+                $merchantReference
             );
         } catch (BMaGlassApiException $e) {
             wc_add_notice($e->userMessage(), 'error');
@@ -320,8 +374,9 @@ class WC_Gateway_BMaGlass_Mobile_Money extends WC_Payment_Gateway
 
         $reference = isset($collection['reference']) ? (string) $collection['reference'] : '';
         $order->update_meta_data('_bmaglass_momo_reference', $reference);
-        $order->update_meta_data('_bmaglass_momo_merchant_reference', self::merchant_reference($order_id));
+        $order->update_meta_data('_bmaglass_momo_merchant_reference', $merchantReference);
         $order->update_meta_data('_bmaglass_momo_phone', $phone);
+        $order->update_meta_data('_bmaglass_momo_attempts', $attempt > 0 ? $attempt : 1);
         // The amount actually charged — in buyer mode the API grosses
         // the order total up by the 1% service charge, so the order
         // note must quote the collection's amount, never the order

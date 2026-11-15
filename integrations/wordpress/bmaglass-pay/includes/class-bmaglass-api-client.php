@@ -70,6 +70,11 @@ if (!class_exists('BMaGlassApiException')) {
                         . 'Create a key with the needed scopes in BMaGlass Pay and try again.';
                 case 'unsupported_currency':
                     return $this->getMessage();
+                case 'network_error':
+                    // The stored message carries the raw curl detail
+                    // (for order notes / logs); the buyer-facing
+                    // message never shows a system error string.
+                    return 'BMaGlass Pay couldn\'t be reached. Check the connection and try again.';
                 default:
                     $msg = $this->getMessage();
                     return $msg !== '' ? $msg
@@ -152,9 +157,7 @@ if (!class_exists('BMaGlassClient')) {
 
         // ── Endpoints ────────────────────────────────────────────────
 
-        /** GET /wallets — the key owner's wallets with balances. */
-        /**
-         * GET /connector/config — everything a connector renders from:
+        /** GET /connector/config — everything a connector renders from:
          * this key's environment, the business's country/currency/
          * status, feature states (mobile_money is enabled only for
          * businesses registered in Zambia with the feature switched
@@ -205,6 +208,7 @@ if (!class_exists('BMaGlassClient')) {
             return $this->request('POST', 'payment-links/' . rawurlencode((string) $linkId) . '/simulate-payment');
         }
 
+        /** GET /wallets — the key owner's wallets with balances. */
         public function wallets()
         {
             return $this->request('GET', 'wallets');

@@ -11,6 +11,8 @@
  */
 
 define('ABSPATH', __DIR__ . '/');
+define('MINUTE_IN_SECONDS', 60);
+define('DAY_IN_SECONDS', 86400);
 error_reporting(E_ALL & ~E_DEPRECATED);
 
 require_once dirname(__DIR__) . '/bmaglass-pay/includes/class-bmaglass-api-client.php';
@@ -79,6 +81,14 @@ function wc_get_orders($args)
             if (isset($clause['key']) && $clause['key'] === '_bmaglass_momo_merchant_reference' && isset($clause['value'])) {
                 $wantMomoRef = $clause['value'];
             }
+            // Cron sweeps use EXISTS / NOT EXISTS comparisons.
+            if (isset($clause['key']) && isset($clause['compare'])) {
+                if ($clause['compare'] === 'EXISTS') {
+                    $wantExists[] = $clause['key'];
+                } elseif ($clause['compare'] === 'NOT EXISTS') {
+                    $wantNotExists[] = $clause['key'];
+                }
+            }
         }
     }
     foreach ($GLOBALS['orders'] as $order) {
@@ -89,6 +99,20 @@ function wc_get_orders($args)
             continue;
         }
         if ($wantMomoRef !== null && $order->get_meta('_bmaglass_momo_merchant_reference') !== $wantMomoRef) {
+            continue;
+        }
+        $skip = false;
+        foreach (isset($wantExists) ? $wantExists : array() as $k) {
+            if ($order->get_meta($k) === '') {
+                $skip = true;
+            }
+        }
+        foreach (isset($wantNotExists) ? $wantNotExists : array() as $k) {
+            if ($order->get_meta($k) !== '') {
+                $skip = true;
+            }
+        }
+        if ($skip) {
             continue;
         }
         $out[] = $order;
@@ -234,6 +258,101 @@ check('momo failed collection fails the order with the reason',
     && $order->complete_calls === 0
     && $order->get_status() === 'failed'
     && strpos(implode(' ', $order->notes), 'Insufficient funds') !== false);
+
+// ── Link-list cap: GET /payment-links returns max 100, newest ───────
+// first. A store with >100 links can have the order's link beyond
+// the list — reconciliation must say so (once) instead of silently
+// standing down forever.
+function capped_link_client($includePaidLK1)
+{
+    $transport = function ($method, $url, $headers, $body) use ($includePaidLK1) {
+        if (str_ends_with($url, '/payment-links') && $method === 'GET') {
+            $links = array();
+            if ($includePaidLK1) {
+                $links[] = array('id' => 'pl1', 'link_code' => 'LK1', 'payment_count' => 1, 'total_collected' => 5);
+            }
+            // Exactly 100 rows either way: LK1 absent (cap hit, link
+            // beyond it) or LK1 present (cap hit, link inside it).
+            for ($i = 2; $i <= ($includePaidLK1 ? 100 : 101); $i++) {
+                $links[] = array('id' => 'pl' . $i, 'link_code' => 'LK' . $i, 'payment_count' => 0, 'total_collected' => 0);
+            }
+            if (!$includePaidLK1) {
+                $links = array_slice($links, 0, 100);
+            }
+            return array(200, json_encode(array('data' => $links, 'mode' => 'live')));
+        }
+        return array(404, json_encode(array('error' => 'not_found', 'message' => 'no route')));
+    };
+    return new BMaGlassClient('bmp_live_reconciler_test', null, $transport);
+}
+
+$order = fresh_order();
+$client = capped_link_client(false);
+check('capped list: order is NOT completed from beyond the cap',
+    BMaGlass_Reconciler::reconcile_order($order, $client) === false
+    && $order->complete_calls === 0
+    && $order->get_status() === 'on-hold');
+check('capped list: the order is told verification was inconclusive',
+    strpos(implode(' ', $order->notes), '100') !== false);
+$noteCount = count($order->notes);
+BMaGlass_Reconciler::reconcile_order($order, $client);
+check('capped list: the warning is noted only once',
+    count($order->notes) === $noteCount);
+
+$order = fresh_order();
+check('capped list: a paid link inside the 100 still completes',
+    BMaGlass_Reconciler::reconcile_order($order, capped_link_client(true)) === true
+    && $order->complete_calls === 1);
+
+// ── Cron sweep: no environment gate ──────────────────────────────────
+// reconcile_pending() runs for the key's own environment: a sandbox
+// key reconciles its sandbox mobile-money orders (whose checkout
+// works with sandbox keys); a live key reconciles live ones.
+class FakeGatewaysCollection
+{
+    public function payment_gateways() { return $GLOBALS['test_gateways']; }
+}
+class FakeWCForCron
+{
+    public function payment_gateways() { return new FakeGatewaysCollection(); }
+}
+function WC() { return new FakeWCForCron(); }
+class FakeBmaglassGateway
+{
+    public function client() { return $GLOBALS['test_client']; }
+}
+
+function sandbox_cron_client()
+{
+    $transport = function ($method, $url, $headers, $body) {
+        if (str_ends_with($url, '/payment-links') && $method === 'GET') {
+            return array(200, json_encode(array('data' => array(
+                array('id' => 'pl1', 'link_code' => 'LK1', 'payment_count' => 1, 'total_collected' => 5),
+            ), 'mode' => 'test')));
+        }
+        if (strpos($url, '/mobile-money/collections/') !== false && $method === 'GET') {
+            return array(200, json_encode(array('data' => array(
+                'reference' => 'BMG-MOMO1', 'merchant_reference' => 'woo-order-9',
+                'amount' => 100, 'currency' => 'ZMW', 'operator' => 'mtn', 'phone' => '0961111111',
+                'status' => 'successful', 'failure_reason' => null,
+            ), 'mode' => 'test')));
+        }
+        return array(404, json_encode(array('error' => 'not_found', 'message' => 'no route')));
+    };
+    // A sandbox key: mode() is 'test', isLive() false.
+    return new BMaGlassClient('bmp_test_reconciler_test', null, $transport);
+}
+
+$linkOrder = fresh_order();
+$momoOrder = fresh_momo_order();
+$GLOBALS['orders'] = array($linkOrder, $momoOrder);
+$GLOBALS['test_gateways'] = array('bmaglass' => new FakeBmaglassGateway());
+$GLOBALS['test_client'] = sandbox_cron_client();
+BMaGlass_Reconciler::reconcile_pending();
+check('cron with a sandbox key reconciles the paid link order',
+    $linkOrder->complete_calls === 1 && $linkOrder->get_meta('_bmaglass_settled') === 'yes');
+check('cron with a sandbox key reconciles the settled MoMo order',
+    $momoOrder->complete_calls === 1 && $momoOrder->get_meta('_bmaglass_settled') === 'yes');
 
 echo $failures === 0 ? "\nALL PASS\n" : "\n$failures FAILURE(S)\n";
 exit($failures === 0 ? 0 : 1);

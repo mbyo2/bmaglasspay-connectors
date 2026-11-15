@@ -25,19 +25,27 @@ if (!defined('ABSPATH')) {
 
 class BMaGlass_Reconciler
 {
-    /** Fetch the payment-link row for an order, or null. */
+    /**
+     * Fetch the payment-link row for an order, or null. Also reports
+     * whether the list hit the API's 100-row cap (GET /payment-links
+     * returns max 100, newest first): when capped and the code is not
+     * in the list, the link may simply be older than the 100 newest —
+     * "not found" is inconclusive, not "unpaid".
+     *
+     * @return array{link: array|null, capped: bool}
+     */
     private static function fetch_link(BMaGlassClient $client, $linkCode)
     {
         $links = $client->listPaymentLinks();
         if (!is_array($links)) {
-            return null;
+            return array('link' => null, 'capped' => false);
         }
         foreach ($links as $link) {
             if (isset($link['link_code']) && $link['link_code'] === $linkCode) {
-                return $link;
+                return array('link' => $link, 'capped' => count($links) >= 100);
             }
         }
-        return null;
+        return array('link' => null, 'capped' => count($links) >= 100);
     }
 
     /**
@@ -57,12 +65,20 @@ class BMaGlass_Reconciler
             return false;
         }
         try {
-            $link = self::fetch_link($client, $code);
+            $found = self::fetch_link($client, $code);
         } catch (BMaGlassApiException $e) {
             $order->add_order_note('BMaGlass: settlement check failed — ' . $e->userMessage());
             return false;
         }
+        $link = $found['link'];
         if ($link === null) {
+            if ($found['capped'] && $order->get_meta('_bmaglass_list_cap_warned') !== 'yes') {
+                // One-time flag, not a failure: the webhook remains
+                // the primary settlement path for this order.
+                $order->update_meta_data('_bmaglass_list_cap_warned', 'yes');
+                $order->add_order_note('BMaGlass: couldn\'t verify this order\'s payment link — the account has more than 100 payment links and the API only lists the 100 newest. The order still completes from the signed payment_link.paid webhook; check the link in BMaGlass Pay if this order stays on-hold.');
+                $order->save();
+            }
             return false;
         }
         $seen = (int) $order->get_meta('_bmaglass_payment_count_seen');
@@ -257,9 +273,15 @@ class BMaGlass_Reconciler
             return;
         }
         $client = $gateways['bmaglass']->client();
-        if ($client === null || !$client->isLive()) {
+        if ($client === null) {
             return;
         }
+        // No environment gate here: the key selects its own
+        // environment server-side, so a sandbox key can only ever
+        // see sandbox objects (its mobile-money orders, whose
+        // checkout works with sandbox keys) and a live key only live
+        // ones. The hosted-link gateway never creates sandbox link
+        // orders, so the link sweep finds nothing for a sandbox key.
         $orders = wc_get_orders(array(
             'status' => array('on-hold', 'pending'),
             'limit' => 50,
