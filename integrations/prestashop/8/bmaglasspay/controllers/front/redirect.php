@@ -43,6 +43,14 @@ class BmaglasspayRedirectModuleFrontController extends ModuleFrontController
             $orderId = (int) $this->module->currentOrder;
         }
         $order = new Order((int) $orderId);
+        // Reuse the link already created for this order (refresh /
+        // double-click / back-button): creating a second link would
+        // leave two payable links for one order, and a payment on the
+        // superseded link would have no order to complete.
+        $existingLink = $this->module->getRecordedLink((int) $orderId);
+        if ($existingLink) {
+            Tools::redirect(Client::paymentLinkUrl($existingLink));
+        }
         try {
             // "Return to store" on the hosted pay page after payment.
             $returnUrl = $this->context->link->getPageLink('order-confirmation', true, null,
