@@ -15,8 +15,7 @@ repo's [`VERSIONS.md`](../../../VERSIONS.md).
    apps list, and install **Payment Provider: BMaGlass Pay**.
 2. Invoicing/Accounting → Configuration → Payment Providers →
    **BMaGlass Pay**: paste an API key created in BMaGlass Pay
-   (Business settings or the API page) with scopes `wallets:read`,
-   `payment_links:read`, `payment_links:write`.
+   (Business settings or the API page) with scopes `config:read`, `wallets:read`, `payment_links:read`, `payment_links:write`, `webhooks:write`.
 3. **Test connection** — shows the account's wallets and whether the
    key is test or live.
 4. **Register webhook** — registers
@@ -52,7 +51,7 @@ Verified against the official Odoo 16.0 developer reference
 ## Verification status (honest boundary)
 
 - `python3 -m compileall` clean; `tests/test_bmaglass_client.py`
-  (this folder) — 15 tests green against a stub transport.
+  (this folder) — 28 tests green against a stub transport.
 - The vendored client is byte-identical across all five Odoo
   variants (`../check-clients.sh`) and was live-proven against the
   production developer API in the original programme.

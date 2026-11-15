@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 import logging
 from datetime import datetime, timedelta, timezone
+from urllib.parse import parse_qs, urlparse
 
 from odoo import fields, models
+from odoo.exceptions import UserError
 
-from .bmaglass_api import BMaGlassError, paid_event_matches, payment_link_url
+from .bmaglass_api import (
+    BMaGlassError, momo_event_matches, paid_event_matches, payment_link_url,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -14,21 +18,91 @@ class PaymentTransaction(models.Model):
 
     bmaglass_link_id = fields.Char(string="BMaGlass payment link ID", readonly=True)
     bmaglass_link_code = fields.Char(string="BMaGlass payment link code", readonly=True)
+    bmaglass_momo_reference = fields.Char(
+        string="BMaGlass mobile money reference", readonly=True,
+        help="Platform reference (BMG-...) of the mobile money collection started "
+             "for this transaction, if it was paid by mobile money.")
 
-    # -- checkout ---------------------------------------------------------
-    def _bmaglass_create_link(self):
-        """Create the per-transaction payment link via the developer API."""
+    # -- helpers ----------------------------------------------------------
+    def _bmaglass_is_momo(self):
+        """True when the buyer picked the Mobile Money method."""
         self.ensure_one()
+        return self.payment_method_id.code == "bmaglass_momo"
+
+    def _bmaglass_link_title(self):
+        self.ensure_one()
+        return "Order %s — %s" % (self.reference, self.provider_id.company_id.name or "Odoo")
+
+    def _bmaglass_redirect_url(self):
+        """Absolute buyer return URL for the hosted pay page.
+
+        The transaction's landing_route (set by core's payment route,
+        e.g. /payment/confirmation?tx_id=..&access_token=..) is where
+        Odoo expects the buyer back; the hosted page offers it as the
+        way back to the store. None when no landing route was set (the
+        link is then created without a return URL, as before).
+        """
+        self.ensure_one()
+        return self.provider_id._bmaglass_landing_url(self.landing_route)
+
+    def _bmaglass_access_token(self):
+        """The access token core attached to this transaction's landing
+        route (parsed out of it), falling back to recomputing it from
+        the same values the payment route used. Used to authenticate
+        the mobile-money start/status routes for this transaction."""
+        self.ensure_one()
+        try:
+            query = parse_qs(urlparse(self.landing_route or "").query)
+            token = (query.get("access_token") or [None])[0]
+            if token:
+                return token
+        except Exception:
+            pass
+        try:
+            from odoo.addons.payment import utils as payment_utils
+            return payment_utils.generate_access_token(
+                self.partner_id.id, self.amount, self.currency_id.id)
+        except Exception:
+            _logger.warning("BMaGlass: could not derive an access token for %s", self.reference)
+            return None
+
+    # -- checkout: wallet link ---------------------------------------------
+    def _bmaglass_create_link(self):
+        """Create the per-transaction payment link via the developer API.
+
+        One link per transaction: a stored link code is reused, so a
+        re-rendered payment page (or a retried checkout step) never
+        mints a second payable link for the same order — a payment on
+        an orphaned earlier link could never settle, because the
+        webhook matches on the transaction's current link code.
+        """
+        self.ensure_one()
+        if self.bmaglass_link_code:
+            return {"id": self.bmaglass_link_id, "link_code": self.bmaglass_link_code}
         provider = self.provider_id
         client = provider._bmaglass_client()
-        expires = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
-        link = client.create_payment_link(
-            title="Order %s — %s" % (self.reference, provider.company_id.name or "Odoo"),
-            amount=self.amount,
-            currency=self.currency_id.name,
-            description="Odoo payment %s" % self.reference,
-            expires_at=expires,
-        )
+        try:
+            link = client.create_payment_link(
+                title=self._bmaglass_link_title(),
+                amount=self.amount,
+                currency=self.currency_id.name,
+                description="Odoo payment %s" % self.reference,
+                expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+                redirect_url=self._bmaglass_redirect_url(),
+            )
+        except BMaGlassError as e:
+            if e.code != "network_error":
+                raise
+            # The response was cut — the link may already exist
+            # server-side (a POST whose response never arrives still
+            # settles on BMaGlass; proven live: a cut simulate-payment
+            # still counted). Recover it by title instead of minting
+            # a second payable link for the same order.
+            link = self._bmaglass_recover_link(client)
+            if not link:
+                raise
+            _logger.info("BMaGlass: recovered link %s for %s after a cut response.",
+                         link.get("link_code"), self.reference)
         self.write({
             "bmaglass_link_id": link.get("id"),
             "bmaglass_link_code": link.get("link_code"),
@@ -36,16 +110,56 @@ class PaymentTransaction(models.Model):
         })
         return link
 
+    def _bmaglass_recover_link(self, client):
+        """Find the link this transaction's cut create call already
+        made: same title, same amount, same currency. None when there
+        is no such link (or the list call itself fails)."""
+        self.ensure_one()
+        try:
+            links = client.list_payment_links()
+        except BMaGlassError as e:
+            _logger.warning("BMaGlass link recovery failed for %s: %s",
+                            self.reference, e.user_message())
+            return None
+        for link in links or []:
+            if link.get("title") != self._bmaglass_link_title():
+                continue
+            if str(link.get("currency") or "").upper() != self.currency_id.name:
+                continue
+            try:
+                if round(float(link.get("amount")), 2) != round(float(self.amount), 2):
+                    continue
+            except (TypeError, ValueError):
+                continue
+            return link
+        return None
+
     def _get_specific_rendering_values(self, processing_values):
-        """Redirect flow: send the buyer to the hosted BMaGlass page."""
+        """Redirect flow: send the buyer to the hosted BMaGlass page
+        (wallet method) or show the mobile-money phone form."""
         res = super()._get_specific_rendering_values(processing_values)
         if self.provider_code != "bmaglass":
             return res
+        res["bmaglass_momo"] = False  # the redirect template branches on this
+        if self._bmaglass_is_momo():
+            res.update({
+                "bmaglass_momo": True,
+                "bmaglass_tx_id": self.id,
+                "bmaglass_access_token": self._bmaglass_access_token(),
+                "bmaglass_amount": "{:,.2f}".format(float(self.amount)),
+                "bmaglass_currency": self.currency_id.name,
+                "bmaglass_phone": (self.partner_id.phone or "").strip(),
+                "bmaglass_landing_route": self.landing_route or "/payment/confirmation",
+            })
+            return res
         try:
             link = self._bmaglass_create_link()
-        except BMaGlassError as e:
-            # Plain language for the buyer — never a raw API response.
-            self._set_error(e.user_message())
+        except (BMaGlassError, UserError) as e:
+            # Plain language for the buyer — never a raw API response
+            # and never a checkout crash (a provider with no key, or a
+            # refused key, lands here instead of 500ing the route).
+            message = e.user_message() if isinstance(e, BMaGlassError) else str(e)
+            self._set_error(message)
             return res
         res["api_url"] = payment_link_url(link.get("link_code"))
         return res
@@ -55,6 +169,7 @@ class PaymentTransaction(models.Model):
         if self.provider_code == "bmaglass":
             res["bmaglass_link_code"] = self.bmaglass_link_code
         return res
+
 
     def _bmaglass_log(self, message):
         """Record a settlement note without ever breaking settlement.
@@ -143,22 +258,133 @@ class PaymentTransaction(models.Model):
             return False
         return False
 
+    # -- mobile money -------------------------------------------------------
+    def _bmaglass_momo_create(self, phone, operator=None):
+        """Start a mobile money collection for this transaction.
+
+        The collection's merchant reference IS the transaction
+        reference, so a retried start (double-click, back button)
+        returns the original collection instead of charging the buyer
+        twice. A collection already started is never started again.
+        Mobile money collects in ZMW only, and only on a live key —
+        sandbox keys use simulated money and can never take a payment.
+        Returns the collection; settles immediately when it is already
+        successful (synchronous settlement is rare but real).
+        """
+        self.ensure_one()
+        if self.bmaglass_momo_reference:
+            return {"reference": self.bmaglass_momo_reference, "status": "pending"}
+        if str(self.currency_id.name).upper() != "ZMW":
+            raise BMaGlassError(
+                0, "unsupported_currency",
+                "Mobile money collects in ZMW. This transaction is in %s, so pay "
+                "it with the BMaGlass Pay wallet method instead." % self.currency_id.name)
+        provider = self.provider_id
+        client = provider._bmaglass_client()
+        if not client.is_live:
+            raise BMaGlassError(0, "test_mode_read_only",
+                                "Mobile money needs a production key (bmg_live_...).")
+        collection = client.create_mobile_money_collection(
+            amount=self.amount, phone=phone, operator=operator,
+            reference=self.reference)
+        self.write({"bmaglass_momo_reference": collection.get("reference")})
+        if (collection.get("status") or "").lower() == "successful":
+            self._set_done()
+            self._bmaglass_log(
+                "BMaGlass Pay mobile money payment confirmed at collection start — "
+                "reference %s, %s ZMW."
+                % (collection.get("reference"), "{:,.2f}".format(float(self.amount))))
+        return collection
+
+    def _bmaglass_momo_settle_from_event(self, data):
+        """Settle this transaction from a verified
+        mobile_money.collection.completed event.
+
+        Same shape as the wallet path: the controller HMAC-verified
+        the delivery; momo_event_matches cross-checks the merchant
+        reference, ZMW and the product amount before _set_done().
+        Returns True when settled after the call.
+        """
+        self.ensure_one()
+        if self.state == "done":
+            return True
+        if self.state in ("cancel", "error"):
+            return False
+        # The server only emits mobile_money.collection.completed for
+        # successful collections (dispatchMomoCollectionSettled returns
+        # early otherwise), but a failed status must never settle a
+        # transaction even if the event contract ever changes.
+        if str(data.get("status") or "").lower() not in ("", "successful"):
+            _logger.info(
+                "BMaGlass mobile_money.collection.completed declined for %s: "
+                "status is %s, not successful.", self.reference, data.get("status"))
+            return False
+        ok, reason = momo_event_matches(
+            data, self.reference, self.amount, self.currency_id.name)
+        if not ok:
+            _logger.info(
+                "BMaGlass mobile_money.collection.completed declined for %s: %s",
+                self.reference, reason)
+            return False
+        self._set_done()
+        self._bmaglass_log(
+            "BMaGlass Pay mobile money payment confirmed by webhook "
+            "(mobile_money.collection.completed) — reference %s, %s ZMW."
+            % (data.get("reference"),
+               "{:,.2f}".format(float(data.get("base_amount", data.get("amount") or 0) or 0)))
+        )
+        return True
+
+    def _bmaglass_momo_check_status(self):
+        """Poll the collection for this transaction; settle or fail it.
+
+        Successful -> done (state-guarded, exactly-once). Failed ->
+        error with the rail's reason, so the buyer can try again.
+        Anything else (still pending) leaves the transaction alone.
+        """
+        self.ensure_one()
+        if self.state in ("done", "cancel", "error") or not self.bmaglass_momo_reference:
+            return False
+        client = self.provider_id._bmaglass_client()
+        try:
+            collection = client.get_mobile_money_collection(self.bmaglass_momo_reference)
+        except BMaGlassError as e:
+            _logger.warning("BMaGlass MoMo status check failed for %s: %s",
+                            self.reference, e.user_message())
+            return False
+        status = str((collection or {}).get("status") or "").lower()
+        if status == "successful":
+            self._set_done()
+            self._bmaglass_log(
+                "BMaGlass Pay mobile money payment confirmed by status check — "
+                "reference %s, %s ZMW."
+                % (self.bmaglass_momo_reference, "{:,.2f}".format(float(self.amount))))
+            return True
+        if status == "failed":
+            reason = (collection or {}).get("failure_reason") or "the payment didn't go through"
+            self._set_error("Mobile money payment failed — %s." % reason)
+            return False
+        return False
+
     def _bmaglass_reconcile_pending(self):
         """Cron entry point: sweep unsettled BMaGlass transactions.
 
-        Settlement normally arrives instantly via the payment_link.paid
-        webhook; this scheduled reconciliation is the fallback that
-        settles any transaction whose delivery was missed.
+        Settlement normally arrives instantly via webhook
+        (payment_link.paid / mobile_money.collection.completed); this
+        scheduled reconciliation is the fallback that settles any
+        transaction whose delivery was missed.
         """
         providers = self.env["payment.provider"].search([("code", "=", "bmaglass")])
         txs = self.search([
             ("provider_id", "in", providers.ids),
             ("state", "in", ("pending", "draft")),
-            ("bmaglass_link_code", "!=", False),
             ("create_date", ">", fields.Datetime.now() - timedelta(days=7)),
         ], limit=100)
         for tx in txs:
             try:
-                tx._bmaglass_check_paid()
+                if tx.bmaglass_momo_reference:
+                    tx._bmaglass_momo_check_status()
+                elif tx.bmaglass_link_code:
+                    tx._bmaglass_check_paid()
             except Exception:  # one bad tx must not stop the sweep
                 _logger.exception("BMaGlass reconcile failed for tx %s", tx.reference)

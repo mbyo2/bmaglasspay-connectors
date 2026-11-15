@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import logging
 from datetime import datetime, timedelta, timezone
-
 from odoo import fields, models
+from odoo.exceptions import UserError
 
 from .bmaglass_api import BMaGlassError, paid_event_matches, payment_link_url
 
@@ -14,21 +14,59 @@ class PaymentTransaction(models.Model):
 
     bmaglass_link_id = fields.Char(string="BMaGlass payment link ID", readonly=True)
     bmaglass_link_code = fields.Char(string="BMaGlass payment link code", readonly=True)
-
-    # -- checkout ---------------------------------------------------------
-    def _bmaglass_create_link(self):
-        """Create the per-transaction payment link via the developer API."""
+    # -- helpers ----------------------------------------------------------
+    def _bmaglass_link_title(self):
         self.ensure_one()
+        return "Order %s — %s" % (self.reference, self.provider_id.company_id.name or "Odoo")
+
+    def _bmaglass_redirect_url(self):
+        """Absolute buyer return URL for the hosted pay page.
+
+        The transaction's landing_route (set by core's payment route,
+        e.g. /payment/confirmation?tx_id=..&access_token=..) is where
+        Odoo expects the buyer back; the hosted page offers it as the
+        way back to the store. None when no landing route was set (the
+        link is then created without a return URL, as before).
+        """
+        self.ensure_one()
+        return self.provider_id._bmaglass_landing_url(self.landing_route)
+
+    def _bmaglass_create_link(self):
+        """Create the per-transaction payment link via the developer API.
+
+        One link per transaction: a stored link code is reused, so a
+        re-rendered payment page (or a retried checkout step) never
+        mints a second payable link for the same order — a payment on
+        an orphaned earlier link could never settle, because the
+        webhook matches on the transaction's current link code.
+        """
+        self.ensure_one()
+        if self.bmaglass_link_code:
+            return {"id": self.bmaglass_link_id, "link_code": self.bmaglass_link_code}
         provider = self.provider_id
         client = provider._bmaglass_client()
-        expires = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
-        link = client.create_payment_link(
-            title="Order %s — %s" % (self.reference, provider.company_id.name or "Odoo"),
-            amount=self.amount,
-            currency=self.currency_id.name,
-            description="Odoo payment %s" % self.reference,
-            expires_at=expires,
-        )
+        try:
+            link = client.create_payment_link(
+                title=self._bmaglass_link_title(),
+                amount=self.amount,
+                currency=self.currency_id.name,
+                description="Odoo payment %s" % self.reference,
+                expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+                redirect_url=self._bmaglass_redirect_url(),
+            )
+        except BMaGlassError as e:
+            if e.code != "network_error":
+                raise
+            # The response was cut — the link may already exist
+            # server-side (a POST whose response never arrives still
+            # settles on BMaGlass; proven live: a cut simulate-payment
+            # still counted). Recover it by title instead of minting
+            # a second payable link for the same order.
+            link = self._bmaglass_recover_link(client)
+            if not link:
+                raise
+            _logger.info("BMaGlass: recovered link %s for %s after a cut response.",
+                         link.get("link_code"), self.reference)
         self.write({
             "bmaglass_link_id": link.get("id"),
             "bmaglass_link_code": link.get("link_code"),
@@ -36,16 +74,49 @@ class PaymentTransaction(models.Model):
         })
         return link
 
+    def _bmaglass_recover_link(self, client):
+        """Find the link this transaction's cut create call already
+        made: same title, same amount, same currency. None when there
+        is no such link (or the list call itself fails)."""
+        self.ensure_one()
+        try:
+            links = client.list_payment_links()
+        except BMaGlassError as e:
+            _logger.warning("BMaGlass link recovery failed for %s: %s",
+                            self.reference, e.user_message())
+            return None
+        for link in links or []:
+            if link.get("title") != self._bmaglass_link_title():
+                continue
+            if str(link.get("currency") or "").upper() != self.currency_id.name:
+                continue
+            try:
+                if round(float(link.get("amount")), 2) != round(float(self.amount), 2):
+                    continue
+            except (TypeError, ValueError):
+                continue
+            return link
+        return None
+
     def _get_specific_rendering_values(self, processing_values):
-        """Redirect flow: send the buyer to the hosted BMaGlass page."""
+        """Redirect flow: send the buyer to the hosted BMaGlass page.
+
+        NOTE (16.0): this variant has no Mobile Money method — Odoo
+        16.0 predates the payment.method framework, so there is no
+        second method to offer. MoMo is available on the 17.0–20.0
+        variants; 16.0 takes wallet-link payments only.
+        """
         res = super()._get_specific_rendering_values(processing_values)
         if self.provider_code != "bmaglass":
             return res
         try:
             link = self._bmaglass_create_link()
-        except BMaGlassError as e:
-            # Plain language for the buyer — never a raw API response.
-            self._set_error(e.user_message())
+        except (BMaGlassError, UserError) as e:
+            # Plain language for the buyer — never a raw API response
+            # and never a checkout crash (a provider with no key, or a
+            # refused key, lands here instead of 500ing the route).
+            message = e.user_message() if isinstance(e, BMaGlassError) else str(e)
+            self._set_error(message)
             return res
         res["api_url"] = payment_link_url(link.get("link_code"))
         return res

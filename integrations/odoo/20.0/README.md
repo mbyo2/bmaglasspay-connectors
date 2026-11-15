@@ -13,8 +13,7 @@ matching folder — see [`../README.md`](../README.md) and the repo's
    standard-library only.
 2. Invoicing/Accounting → Configuration → Payment Providers →
    **BMaGlass Pay**: paste an API key created in BMaGlass Pay
-   (Business settings or the API page) with scopes `wallets:read`,
-   `payment_links:read`, `payment_links:write`.
+   (Business settings or the API page) with scopes `config:read`, `wallets:read`, `payment_links:read`, `payment_links:write`, `webhooks:write`, `mobile_money:create`, `mobile_money:read`.
 3. **Test connection** — shows the account's wallets and whether the
    key is test or live.
 4. **Register webhook** — registers
@@ -38,31 +37,54 @@ and the Odoo 20 release notes:
   variants gate enabling on `@api.constrains("state", ...)` and
   anchor the form view after the `state` field — neither is a stable
   anchor in 20.0, so this variant:
-  - constrains only the **API key format** (`bmp_live_` / `bmp_test_`
-    prefix) at configuration time;
+  - constrains only the **API key format** (must start with `bmg_` or
+    legacy `bmp_` — live keys are `bmg_live_…`, sandbox keys
+    `bmg_sandbox_…`) at configuration time;
   - enforces the honest test-mode rule **at payment-link creation**
     (`_bmaglass_create_link` refuses a non-live key with the
     test-mode explanation before any link exists — the API also
     independently refuses test-key writes);
   - anchors the provider form fields after the **`code`** field;
   - sets **no state value** on the provider data record — it takes
-    Odoo 20's own default and starts unpublished until enabled.
-- **No `_log_message_on_transaction`** (as in 19.0): settlement
-  notes are posted with `mail.thread`'s `message_post()`.
+    Odoo 20's own default — and the data record sets
+    `is_published` **False**: Odoo 20 lists providers on
+    `is_published` alone, so publishing at install would offer
+    BMaGlass at checkout before any API key is configured. An admin
+    publishes it with a live key, like the other variants.
+- **No `_log_message_on_transaction`** (as in 19.0 — in fact in no
+  version): settlement notes go through the crash-proof
+  `_bmaglass_log()` helper (`_log_message_on_linked_documents`
+  first, falling back to the server log).
+- **Settlement goes through the `payment.data` queue.** Odoo 20
+  forbids writing a payment transaction from a controller or cron:
+  webhook payloads and reconciliation findings are queued with
+  `_record()` and the state change happens in `_apply_updates()`
+  under core's locked processing. The reconciliation records the
+  transaction's own amount (never the link's lifetime
+  `total_collected`), so an overpaid link can no longer flip a
+  settled transaction to `error` under core's exact-amount check.
+- **Mobile Money (ZMW only).** As in 17.0–19.0: a phone form at
+  checkout starts an idempotent MTN / Airtel / Zamtel collection; the
+  signed `mobile_money.collection.completed` webhook settles it via
+  the `payment.data` queue, with the status poll and the 5-minute
+  cron as fallbacks. Requires mobile money connected on the BMaGlass
+  account, a live key, and the `mobile_money:create` /
+  `mobile_money:read` scopes.
 - The 19.0 processing API (`_search_by_reference` / `_process` /
   `_apply_updates`) carries into 20; this module settles through its
   own controller + cron and is unaffected, as in 19.0.
 - `_get_supported_currencies` is documented in the 20 reference and
   is used as in 17.0–19.0 (ZMW/USD intersection).
 
-Behaviour is otherwise identical: one payment link per transaction,
-`payment_link.paid` push settlement, 5-minute reconciliation
-fallback, exactly-once settlement.
+Behaviour is otherwise identical: one payment link per transaction
+(reused on re-render, created with a `redirect_url` back to the Odoo
+confirmation page), `payment_link.paid` push settlement, 5-minute
+reconciliation fallback, exactly-once settlement.
 
 ## Verification status (honest boundary)
 
 - `python3 -m compileall` clean; `tests/test_bmaglass_client.py`
-  (this folder) — 15 tests green against a stub transport.
+  (this folder) — 28 tests green against a stub transport.
 - The vendored client is byte-identical across all five Odoo
   variants (`../check-clients.sh`) and was live-proven against the
   production developer API in the original programme.

@@ -10,8 +10,7 @@ repo's [`VERSIONS.md`](../../../VERSIONS.md).
    apps list, and install **Payment Provider: BMaGlass Pay**.
 2. Invoicing/Accounting → Configuration → Payment Providers →
    **BMaGlass Pay**: paste an API key created in BMaGlass Pay
-   (Business settings or the API page) with scopes `wallets:read`,
-   `payment_links:read`, `payment_links:write`.
+   (Business settings or the API page) with scopes `config:read`, `wallets:read`, `payment_links:read`, `payment_links:write`, `webhooks:write`, `mobile_money:create`, `mobile_money:read`.
 3. **Test connection** — shows the account's wallets and whether the
    key is test or live.
 4. **Register webhook** — registers
@@ -27,6 +26,14 @@ repo's [`VERSIONS.md`](../../../VERSIONS.md).
 - Each payment transaction creates **one BMaGlass payment link** for
   the exact amount; the buyer is redirected to the hosted page
   `https://bmaglasspay.online/pay/<code>` and pays wallet-to-wallet.
+- The link is created **once per transaction and reused on re-render** —
+  a re-rendered payment page never mints a second payable link for the
+  same order. If the create response is cut in transit, the module
+  recovers the already-created link (title + amount + currency match)
+  instead of minting a duplicate.
+- The link carries a **`redirect_url`** back to this transaction's Odoo
+  confirmation page (`/payment/confirmation?tx_id=…&access_token=…`),
+  so the buyer returns to the store after paying on the hosted page.
 - Settlement is **push-first**: the signed `payment_link.paid`
   webhook settles the matching transaction immediately (payload
   cross-checked — link code, currency, amount — before `_set_done()`).
@@ -42,7 +49,7 @@ repo's [`VERSIONS.md`](../../../VERSIONS.md).
 ## Verification status (honest boundary)
 
 - `python3 -m compileall` clean; `tests/test_bmaglass_client.py`
-  (this folder) — 15 tests green against a stub transport: client
+  (this folder) — 28 tests green against a stub transport: client
   behaviour, the shared HMAC known-answer vector, and the
   `payment_link.paid` semantic guard.
 - The vendored client (`models/bmaglass_api.py`) is byte-identical

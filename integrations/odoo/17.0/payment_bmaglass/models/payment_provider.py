@@ -19,7 +19,8 @@ class PaymentProvider(models.Model):
     bmaglass_api_key = fields.Char(
         string="BMaGlass API key",
         help="Create a key in BMaGlass Pay (Business settings or the API page) with the "
-             "wallets:read, payment_links:read, payment_links:write and webhooks:write scopes. "
+             "config:read, wallets:read, payment_links:read, payment_links:write, "
+             "webhooks:write, mobile_money:create and mobile_money:read scopes. "
              "A production key (bmg_live_...) is required to take payments.",
         groups="base.group_system",
     )
@@ -40,9 +41,28 @@ class PaymentProvider(models.Model):
         except BMaGlassError as e:
             raise UserError(e.user_message())
 
+    def _bmaglass_base_url(self):
+        """This Odoo instance's public base URL (web.base.url)."""
+        self.ensure_one()
+        return (self.env["ir.config_parameter"].sudo().get_param("web.base.url") or "").strip()
+
     def _bmaglass_webhook_url(self):
-        base = self.env["ir.config_parameter"].sudo().get_param("web.base.url")
+        base = self._bmaglass_base_url()
+        if not base:
+            raise UserError(
+                "Set this Odoo instance's public web address (web.base.url) before "
+                "registering the webhook — BMaGlass has nowhere to deliver events to.")
         return "%s/payment/bmaglass/webhook" % base.rstrip("/")
+
+    def _bmaglass_landing_url(self, landing_route):
+        """Absolute URL for a (relative) transaction landing route, or
+        None when there is no route or no base URL to build it from."""
+        self.ensure_one()
+        route = (landing_route or "").strip()
+        base = self._bmaglass_base_url()
+        if not route or not base:
+            return None
+        return "%s%s" % (base.rstrip("/"), route if route.startswith("/") else "/" + route)
 
     # -- framework hooks --------------------------------------------------
     def _get_supported_currencies(self):
@@ -64,7 +84,7 @@ class PaymentProvider(models.Model):
         default_codes = super()._get_default_payment_method_codes()
         if self.code != "bmaglass":
             return default_codes
-        return ["bmaglass"]
+        return ["bmaglass", "bmaglass_momo"]
 
     @api.constrains("state", "bmaglass_api_key")
     def _check_bmaglass_enabled_needs_live_key(self):
@@ -91,12 +111,33 @@ class PaymentProvider(models.Model):
             wallets = client.wallets()
         except BMaGlassError as e:
             raise UserError(e.user_message())
-        parts = ["%s %s" % (w.get("currency"), "{:,.2f}".format(float(w.get("balance", 0))))
-                 for w in wallets]
+        if not isinstance(wallets, list):
+            raise UserError("BMaGlass Pay answered in an unexpected format — try again.")
+        parts = []
+        for w in wallets:
+            if not isinstance(w, dict):
+                continue
+            try:
+                balance = float(w.get("balance") or 0)
+            except (TypeError, ValueError):
+                balance = 0.0
+            parts.append("%s %s" % (w.get("currency") or "?", "{:,.2f}".format(balance)))
         message = "Connected to BMaGlass Pay (%s key). Wallets: %s." % (
             client.mode, " · ".join(parts) or "none")
         if client.mode == "test":
             message += " " + TEST_MODE_MESSAGE
+        try:
+            config = client.connector_config()
+            mm = ((config or {}).get("features") or {}).get("mobile_money") or {}
+            if isinstance(mm, dict) and mm.get("status"):
+                if mm.get("status") == "enabled" and mm.get("connected"):
+                    message += " Mobile Money: enabled and connected."
+                elif mm.get("status") == "enabled":
+                    message += " Mobile Money: enabled in BMaGlass but no mobile money account is connected yet."
+                else:
+                    message += " Mobile Money: %s." % mm.get("status")
+        except BMaGlassError:
+            pass  # wallets already proved the connection; config needs config:read
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
@@ -119,7 +160,8 @@ class PaymentProvider(models.Model):
         try:
             hook = client.create_webhook(
                 self._bmaglass_webhook_url(),
-                ["transaction.completed", "payment_link.created", "payment_link.paid", "webhook.test"],
+                ["transaction.completed", "payment_link.created", "payment_link.paid",
+                 "mobile_money.collection.completed", "webhook.test"],
             )
         except BMaGlassError as e:
             raise UserError(e.user_message())

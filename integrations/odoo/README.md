@@ -22,10 +22,20 @@ Full landscape and sources: [`VERSIONS.md`](../../VERSIONS.md).
 
 ## Shared behaviour (every variant)
 
-- Connect by API key (`bmp_live_…` / `bmp_test_…`) with **Test
-  connection** and one-click **Register webhook** tools.
-- One hosted payment link per transaction; the buyer pays
-  wallet-to-wallet on `https://bmaglasspay.online/pay/<code>`.
+- Connect by API key (`bmg_live_…` / `bmg_sandbox_…`, legacy `bmp_…`
+  still accepted) with **Test connection** and one-click **Register
+  webhook** tools.
+- One hosted payment link per transaction (reused on re-render, never
+  re-minted; a cut create response is recovered, not duplicated);
+  the buyer pays wallet-to-wallet on
+  `https://bmaglasspay.online/pay/<code>` and is sent back to the
+  store via the link's `redirect_url` (the transaction's Odoo
+  confirmation page).
+- **Mobile Money (17.0–20.0; ZMW only):** a phone form at checkout
+  starts an idempotent MTN / Airtel / Zamtel collection; the signed
+  `mobile_money.collection.completed` webhook settles it, with the
+  status poll and the 5-minute cron as fallbacks. 16.0 is wallet-only
+  (no `payment.method` framework).
 - Settlement is **push-first**: the signed `payment_link.paid`
   webhook settles immediately (payload cross-checked before
   `_set_done()`); a 5-minute cron reconciliation is the fallback.
@@ -43,9 +53,10 @@ Full landscape and sources: [`VERSIONS.md`](../../VERSIONS.md).
 
 ## What actually differs between variants
 
-- **16.0**: no `_get_supported_currencies` and no
-  `_log_message_on_transaction` in the documented API — the
-  currency allowlist is enforced at transaction creation.
+- **16.0**: no `_get_supported_currencies` in the documented API —
+  the currency allowlist is enforced at transaction creation. (No
+  version has `_log_message_on_transaction` — it does not exist in
+  16.0–20.0; settlement notes go through `_bmaglass_log()`.)
 - **17.0 / 18.0**: the documented payment API this module uses is
   the same in both (verified page-by-page); the variants differ in
   manifest version and install docs, honestly, rather than in
@@ -57,7 +68,12 @@ Full landscape and sources: [`VERSIONS.md`](../../VERSIONS.md).
 - **20.0**: the provider state rework — nothing in the variant
   reads/writes a provider `state` value: the live-key rule is
   enforced at payment-link creation, the form anchors after `code`,
-  and the data record takes the version's own state default.
+  the data record takes the version's own state default and sets
+  `is_published` False (Odoo 20 lists on `is_published` alone, so
+  publishing at install would offer the provider with no key), and
+  settlement goes through the `payment.data` queue (`_record()` /
+  `_apply_updates()`), never a direct write from a controller or
+  cron.
   Default-method activation uses core's `setup_provider()` from a
   `post_init_hook` (B11 — 20 has no state transition to trigger it),
   config parameters use the typed `get_str`/`set_str` accessors
@@ -71,9 +87,11 @@ Full landscape and sources: [`VERSIONS.md`](../../VERSIONS.md).
 ## Verification (all variants)
 
 `python3 -m compileall` clean per module;
-`<version>/tests/test_bmaglass_client.py` — 15 tests green per
+`<version>/tests/test_bmaglass_client.py` — 28 tests green per
 variant (stub transport; client behaviour, HMAC known-answer
-vector, `payment_link.paid` semantic guard). The client was
+vector, `payment_link.paid` semantic guard, `redirect_url` /
+`fee_payer` handling, mobile-money create/get and the
+`mobile_money.collection.completed` semantic guard). The client was
 additionally live-proven against the production developer API in
 the original programme (QA merchant, live key).
 

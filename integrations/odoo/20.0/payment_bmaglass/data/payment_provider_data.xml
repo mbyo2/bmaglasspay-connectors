@@ -5,10 +5,12 @@
         <field name="code">bmaglass</field>
         <!-- No state value is set on purpose: Odoo 20 reworked the
              provider's state handling, so the record takes the
-             version's own default and starts unpublished/disabled
-             until an admin enables it with a live key — the same
-             out-of-box behaviour as the other variants. -->
-        <field name="is_published">True</field>
+             version's own default. is_published is False on purpose:
+             Odoo 20 lists providers on is_published alone (no state
+             gate), so publishing here would offer BMaGlass at checkout
+             before any API key is configured. An admin publishes it
+             with a live key, like the other variants. -->
+        <field name="is_published">False</field>
         <field name="module_id" ref="base.module_payment_bmaglass"/>
         <field name="redirect_form_view_id" ref="payment_bmaglass.redirect_form"/>
         <field name="company_id" ref="base.main_company"/>

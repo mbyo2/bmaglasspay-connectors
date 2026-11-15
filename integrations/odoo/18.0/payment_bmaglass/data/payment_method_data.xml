@@ -11,4 +11,12 @@
         <field name="support_tokenization">False</field>
         <field name="support_express_checkout">False</field>
     </record>
+
+    <record id="payment_method_bmaglass_momo" model="payment.method">
+        <field name="name">BMaGlass Pay — Mobile Money</field>
+        <field name="code">bmaglass_momo</field>
+        <field name="sequence">11</field>
+        <field name="support_tokenization">False</field>
+        <field name="support_express_checkout">False</field>
+    </record>
 </odoo>
