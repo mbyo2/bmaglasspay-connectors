@@ -9,7 +9,7 @@ final deterministically rebuilt zips:
   `bmp_` / `sk_live_` values; `...` placeholders do not match).
 - store (11): scripts/validate-store-zips.py (structure + Odoo client
   tests 15/15 per variant + `php -l` + repo client-identity scripts).
-- WooCommerce: the four mocked-WP suites (116 checks) + `php -l` +
+- WooCommerce: the seven mocked-WP suites (239 checks) + `php -l` +
   `node --check` + unzipped tree diffed against the repo plugin folder.
 - SDKs: TS contract test (47 assertions), Python unittest (8 tests),
   PHP run-tests (26 checks), React Native run-tests (22 checks),
@@ -193,10 +193,13 @@ def main() -> None:
     # Mirror integrations/wordpress/: tests/ beside bmaglass-pay/
     shutil.copytree(ROOT / "integrations" / "wordpress" / "tests",
                     wp_dir / "tests")
-    for suite, expect in (("run-client-tests.php", 49),
+    for suite, expect in (("run-client-tests.php", 61),
                           ("run-blocks-tests.php", 30),
-                          ("run-reconciler-tests.php", 18),
-                          ("run-momo-gateway-tests.php", 30)):
+                          ("run-reconciler-tests.php", 24),
+                          ("run-momo-gateway-tests.php", 30),
+                          ("run-gateway-tests.php", 47),
+                          ("run-webhook-tests.php", 36),
+                          ("run-uninstall-tests.php", 11)):
         rc, out = run(["php", f"tests/{suite}"], cwd=wp_dir)
         passed = out.count("PASS ")
         failed = out.count("FAIL ")
