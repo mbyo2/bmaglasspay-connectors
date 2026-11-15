@@ -19,6 +19,7 @@
                 <field id="webhook_secret" translate="label comment" type="obscure" sortOrder="40" showInDefault="1">
                     <label>Webhook signing secret</label>
                     <comment>Register the webhook URL https://YOUR-STORE/bmaglass/webhook in the BMaGlass Pay developer page (or via the API) and paste the secret shown once. Settlement is additionally confirmed by API reconciliation, so orders complete even if a delivery is missed.</comment>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
                 </field>
                 <field id="order_status" translate="label" type="select" sortOrder="50" showInDefault="1">
                     <label>New order status</label>

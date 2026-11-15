@@ -57,13 +57,15 @@ class Bmaglasspay extends PaymentModule
         ) {
             return false;
         }
-        Db::getInstance()->execute(
+        if (!Db::getInstance()->execute(
             'CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . 'bmaglasspay_orders` (
                 `id_order` INT UNSIGNED NOT NULL PRIMARY KEY,
                 `link_code` VARCHAR(64) NOT NULL,
                 `paid` TINYINT NOT NULL DEFAULT 0
             ) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8mb4'
-        );
+        )) {
+            return false;
+        }
         if (!Configuration::get('BMGLASS_OS_WAITING')) {
             $state = new OrderState();
             $state->name = array((int) Configuration::get('PS_LANG_DEFAULT') => 'Awaiting BMaGlass payment');
@@ -205,11 +207,24 @@ class Bmaglasspay extends PaymentModule
         );
     }
 
+    /**
+     * Link code already created for an order, if any — the redirect
+     * controller reuses it instead of creating a second payable link
+     * for the same order (refresh / double-click / back-button).
+     */
+    public function getRecordedLink($orderId)
+    {
+        $rows = Db::getInstance()->executeS(
+            'SELECT `link_code` FROM `' . _DB_PREFIX_ . 'bmaglasspay_orders` WHERE `id_order` = ' . (int) $orderId . ' LIMIT 1'
+        );
+        return $rows ? (string) $rows[0]['link_code'] : null;
+    }
+
     /** Complete orders whose BMaGlass link has been paid. Exactly once per order. */
     public function reconcilePendingOrders($limit = 50)
     {
         $rows = Db::getInstance()->executeS(
-            'SELECT `id_order`, `link_code` FROM `' . _DB_PREFIX_ . 'bmaglasspay_orders` WHERE `paid` = 0 LIMIT ' . (int) $limit
+            'SELECT `id_order`, `link_code` FROM `' . _DB_PREFIX_ . 'bmaglasspay_orders` WHERE `paid` = 0 ORDER BY `id_order` ASC LIMIT ' . (int) $limit
         );
         if (!$rows) {
             return 0;

@@ -45,7 +45,15 @@ class Config
         // Encrypted backend-model payloads are versioned
         // ("0:3:<base64>"); anything else is plaintext already.
         if (preg_match('/^\d+:\d+:/', $raw)) {
-            $plain = $this->encryptor->decrypt($raw);
+            try {
+                $plain = $this->encryptor->decrypt($raw);
+            } catch (\Exception $e) {
+                // Corrupt / un-decryptable value (e.g. key rotated after
+                // the value was saved): degrade to "no key" so checkout
+                // hides the method and webhooks 400, instead of 500ing
+                // every checkout and webhook delivery.
+                return '';
+            }
             return is_string($plain) ? $plain : '';
         }
         return $raw;

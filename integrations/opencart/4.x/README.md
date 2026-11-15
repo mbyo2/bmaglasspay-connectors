@@ -6,9 +6,23 @@ one renamed. Landscape: [`VERSIONS.md`](../../../VERSIONS.md).
 
 ## Install
 
-1. Copy the contents of `upload/` over your OpenCart root
-   (or zip `upload/` as an extension archive and install via
-   **Extensions → Installer**).
+**Preferred — Extensions → Installer.** Build the archive from
+this folder: zip the *contents* of `upload/extension/bmaglasspay/`
+(`admin/`, `catalog/`, `system/` …) together with `install.json`
+at the zip root, name the file `bmaglasspay.ocmod.zip`, and upload
+it at **Extensions → Installer**. (The filename must be
+`bmaglasspay.ocmod.zip`; the Installer reads `install.json` from
+the zip root and refuses archives without it.) Then continue at
+step 2 below.
+
+**Alternative — manual copy.** Copy the contents of `upload/`
+over your OpenCart root. The payment **Install** in step 2 then
+also registers the extension itself, so the settings page resolves
+— a plain copy without that Install step leaves the admin pages
+at "Page Not Found!" (OpenCart 4.x only registers extension
+namespaces for rows in `oc_extension_install`, which a copy alone
+never creates).
+
 2. **Extensions → Extensions → Payments → BMaGlass Pay → Install**,
    then Edit: enable, paste your API key, use **Test connection**
    to see your wallets, register the shown webhook URL in
