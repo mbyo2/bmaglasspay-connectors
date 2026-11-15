@@ -22,7 +22,7 @@ Oct 2026):
 | 2.4.9 (current, May 2026) | 103.0.9 | 8.4 / 8.5 | to May 2029 |
 | 2.4.8 | 103.0.8 | 8.3 / 8.4 | to May 2028 |
 | 2.4.7 | 103.0.7 | 8.2 / 8.3 | to May 2027 |
-| 2.4.6 | 103.0.6 | 8.1 / 8.2 | extended to Aug 2027 |
+| 2.4.6 | 103.0.6 | 8.1 / 8.2 | **ended Aug 2026** — store is EOL; upgrade it rather than adding a payment method to it |
 
 `BMaGlass/Pay/composer.json` declares `magento/framework: 103.0.*`
 (the framework series spanning all four minors) and `php: ^8.1`

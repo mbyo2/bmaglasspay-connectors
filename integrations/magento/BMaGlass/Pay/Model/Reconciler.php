@@ -58,9 +58,12 @@ class Reconciler
         }
         // Placed redirect-gateway orders sit in payment_review (pending
         // transaction), not pending_payment — sweep both states, and let
-        // the link-code join below be the real selector.
+        // the link-code join below be the real selector. Oldest first:
+        // without an order the 50-per-run sweep can starve old orders
+        // behind a wall of newer pending ones.
         $orders = $this->collectionFactory->create()
             ->addFieldToFilter('state', ['in' => [Order::STATE_PENDING_PAYMENT, Order::STATE_PAYMENT_REVIEW]])
+            ->setOrder('entity_id', 'ASC')
             ->setPageSize($limit);
         $orders->getSelect()->joinInner(
             ['sop' => $orders->getTable('sales_order_payment')],
@@ -127,19 +130,35 @@ class Reconciler
         }
         // Placed redirect-gateway orders sit in payment_review (pending
         // transaction), not pending_payment — sweep both states, and let
-        // the link-code join below be the real selector.
-        $orders = $this->collectionFactory->create()
-            ->addFieldToFilter('state', ['in' => [Order::STATE_PENDING_PAYMENT, Order::STATE_PAYMENT_REVIEW]]);
-        $orders->getSelect()->joinInner(
-            ['sop' => $orders->getTable('sales_order_payment')],
-            'sop.parent_id = main_table.entity_id',
-            []
-        )->where("sop.method = 'bmaglasspay'");
-        foreach ($orders as $order) {
-            $code = $order->getPayment()->getAdditionalInformation('bmaglass_link_code');
-            if ((string) $code === (string) $linkCode) {
-                return $this->completeOrder($order, (string) $linkCode) ? 1 : 0;
+        // the link-code join below be the real selector. Page through
+        // oldest-first in bounded batches: the previous code loaded
+        // EVERY pending order into memory on each webhook delivery,
+        // which grows without bound as abandoned checkouts accumulate.
+        $pageSize = 200;
+        $page = 1;
+        while (true) {
+            $orders = $this->collectionFactory->create()
+                ->addFieldToFilter('state', ['in' => [Order::STATE_PENDING_PAYMENT, Order::STATE_PAYMENT_REVIEW]])
+                ->setOrder('entity_id', 'ASC')
+                ->setPageSize($pageSize)
+                ->setCurPage($page);
+            $orders->getSelect()->joinInner(
+                ['sop' => $orders->getTable('sales_order_payment')],
+                'sop.parent_id = main_table.entity_id',
+                []
+            )->where("sop.method = 'bmaglasspay'");
+            $seen = 0;
+            foreach ($orders as $order) {
+                $seen++;
+                $code = $order->getPayment()->getAdditionalInformation('bmaglass_link_code');
+                if ((string) $code === (string) $linkCode) {
+                    return $this->completeOrder($order, (string) $linkCode) ? 1 : 0;
+                }
             }
+            if ($seen < $pageSize) {
+                break;
+            }
+            $page++;
         }
         return 0;
     }
