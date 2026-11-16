@@ -70,3 +70,15 @@ $event = Client::parseWebhookEvent(file_get_contents('php://input'),
 ```bash
 php sdk/php/tests/run-tests.php   # stub transport + shared HMAC known-answer vector
 ```
+
+## Retries
+
+Transient 502/503/504 (and transport failures) are retried automatically: up to 3 attempts total,
+exponential backoff with full jitter (base 500 ms, see the `$options` constructor argument:
+`max_retries`, `retry_base_delay_ms`, `sleep`). Only idempotent requests are retried — every
+GET/DELETE, and POSTs carrying an `Idempotency-Key`. Payment-link, invoice and transfer creates
+always send one key per logical call (pass your own, or let the SDK generate one with
+`Client::newIdempotencyKey()`) and reuse it across retries, so a retried create replays the
+original object instead of creating a second one. `bitcoinQuote`, `simulatePaymentLinkPayment` /
+`simulateInvoicePayment` and webhook create/test are never retried (no idempotency key). Disable
+with `['max_retries' => 0]`.

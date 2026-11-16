@@ -192,5 +192,98 @@ const html502 = new BMaGlass({ apiKey: "bmp_test_contract", baseUrl: base, fetch
 await assert.rejects(() => html502.wallets.list(),
   (e) => e instanceof BMaGlassError && e.status === 502 && e.code === "request_failed");
 
+// ── Retries on transient 502/503/504 (CEO decision 2026-11-15) ──
+// Policy: max 3 attempts total; only idempotent requests are
+// retried (GET/DELETE, or POSTs carrying an Idempotency-Key);
+// backoff is exponential with full jitter. The stubs below count
+// attempts and record the delays (sleepImpl) and the keys sent.
+{
+  const attemptsFor = (statuses, body = { data: [{ id: "w1", currency: "ZMW", balance: 42 }], mode: "test" }) => {
+    let n = 0;
+    const seenKeys = [];
+    const fetchImpl = async (url, init) => {
+      n++;
+      seenKeys.push(init?.headers?.["Idempotency-Key"]);
+      const status = statuses[Math.min(n - 1, statuses.length - 1)];
+      return { ok: status >= 200 && status < 300, status, text: async () => JSON.stringify(status >= 400 ? { error: "unavailable", message: "try again" } : body) };
+    };
+    return { fetchImpl, count: () => n, seenKeys };
+  };
+
+  // (a) A read that 503s twice then answers succeeds on attempt 3.
+  {
+    const stub = attemptsFor([503, 503, 200]);
+    const delays = [];
+    const c = new BMaGlass({ apiKey: "bmp_test_contract", baseUrl: base, fetchImpl: stub.fetchImpl, retryBaseDelayMs: 100, sleepImpl: async (ms) => { delays.push(ms); } });
+    const wallets = await c.wallets.list();
+    assert.equal(wallets[0].balance, 42);
+    assert.equal(stub.count(), 3, "read retried to 3 attempts");
+    assert.equal(delays.length, 2, "two backoffs before the third attempt");
+    assert.ok(delays[0] >= 0 && delays[0] <= 100, `first backoff in [0,100]: ${delays[0]}`);
+    assert.ok(delays[1] >= 0 && delays[1] <= 200, `second backoff in [0,200]: ${delays[1]}`);
+  }
+  // (b) A payment-link create retried after a 503 reuses the SAME
+  // idempotency key — the server replays the original link.
+  {
+    const stub = attemptsFor([503, 201], { data: { id: "pl1", title: "Retry Link", amount: 10, currency: "ZMW", link_code: "ABC123", status: "active" }, mode: "test" });
+    const c = new BMaGlass({ apiKey: "bmp_test_contract", baseUrl: base, fetchImpl: stub.fetchImpl, retryBaseDelayMs: 0, sleepImpl: async () => {} });
+    const link = await c.paymentLinks.create({ title: "Retry Link", amount: 10, currency: "ZMW" });
+    assert.equal(link.link_code, "ABC123");
+    assert.equal(stub.count(), 2, "keyed create retried once");
+    assert.equal(stub.seenKeys.length, 2);
+    assert.ok(stub.seenKeys[0], "auto idempotency key sent");
+    assert.equal(stub.seenKeys[0], stub.seenKeys[1], "same key on the retry");
+    // An explicit caller key is honoured verbatim, not replaced.
+    const stub2 = attemptsFor([503, 201], { data: { id: "pl1", link_code: "ABC123" }, mode: "test" });
+    const c2 = new BMaGlass({ apiKey: "bmp_test_contract", baseUrl: base, fetchImpl: stub2.fetchImpl, retryBaseDelayMs: 0, sleepImpl: async () => {} });
+    await c2.paymentLinks.create({ title: "Retry Link", amount: 10 }, "caller-key-123");
+    assert.deepEqual(stub2.seenKeys, ["caller-key-123", "caller-key-123"]);
+  }
+  // (c) A 400 is never retried — the request itself is wrong.
+  {
+    const stub = attemptsFor([400]);
+    const c = new BMaGlass({ apiKey: "bmp_test_contract", baseUrl: base, fetchImpl: stub.fetchImpl, retryBaseDelayMs: 0, sleepImpl: async () => {} });
+    await assert.rejects(() => c.wallets.list(), (e) => e instanceof BMaGlassError && e.status === 400);
+    assert.equal(stub.count(), 1, "400s are not retried");
+  }
+  // (d) simulate-payment has no idempotency key: a 503 is NOT retried
+  // (replaying it would double-count the simulated payment).
+  {
+    const stub = attemptsFor([503]);
+    const c = new BMaGlass({ apiKey: "bmp_test_contract", baseUrl: base, fetchImpl: stub.fetchImpl, retryBaseDelayMs: 0, sleepImpl: async () => {} });
+    await assert.rejects(() => c.paymentLinks.simulatePayment("link1"), (e) => e instanceof BMaGlassError && e.status === 503);
+    assert.equal(stub.count(), 1, "simulate-payment is not retried");
+  }
+  // (e) bitcoin/quote has no idempotency key either: a 503 is NOT
+  // retried (each call mints a quote row — a retry would mint two).
+  {
+    const stub = attemptsFor([503]);
+    const c = new BMaGlass({ apiKey: "bmp_test_contract", baseUrl: base, fetchImpl: stub.fetchImpl, retryBaseDelayMs: 0, sleepImpl: async () => {} });
+    await assert.rejects(() => c.bitcoin.quote({ side: "buy", amount_zmw: 100 }), (e) => e instanceof BMaGlassError && e.status === 503);
+    assert.equal(stub.count(), 1, "bitcoin/quote is not retried");
+  }
+  // (f) Retries off (maxRetries 0): a 503 fails on the first attempt.
+  {
+    const stub = attemptsFor([503, 200]);
+    const c = new BMaGlass({ apiKey: "bmp_test_contract", baseUrl: base, fetchImpl: stub.fetchImpl, maxRetries: 0, retryBaseDelayMs: 0, sleepImpl: async () => {} });
+    await assert.rejects(() => c.wallets.list(), (e) => e instanceof BMaGlassError && e.status === 503);
+    assert.equal(stub.count(), 1, "maxRetries 0 means one attempt");
+  }
+  // (g) A transport failure on a read is retried, then surfaces typed.
+  {
+    let n = 0;
+    const c = new BMaGlass({ apiKey: "bmp_test_contract", baseUrl: base, retryBaseDelayMs: 0, sleepImpl: async () => {}, fetchImpl: async () => { n++; throw new TypeError("fetch failed"); } });
+    await assert.rejects(() => c.wallets.list(), (e) => e instanceof BMaGlassError && e.code === "network_error");
+    assert.equal(n, 3, "transport failure retried to 3 attempts");
+  }
+  // (h) Invoices and transfers also carry an auto key on every create.
+  {
+    const stub = attemptsFor([201], { data: { id: "inv1", status: "open" }, mode: "test" });
+    const c = new BMaGlass({ apiKey: "bmp_test_contract", baseUrl: base, fetchImpl: stub.fetchImpl, retryBaseDelayMs: 0, sleepImpl: async () => {} });
+    await c.invoices.create({ amount: 10, currency: "ZMW" });
+    assert.ok(stub.seenKeys[0], "invoice create carries an auto idempotency key");
+  }
+}
+
 server.close();
 console.log("TS SDK contract tests: ALL PASS");

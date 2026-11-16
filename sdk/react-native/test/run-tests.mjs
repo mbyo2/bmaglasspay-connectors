@@ -157,5 +157,90 @@ function stubFetch(handler) {
   catch (e) { check('html 502 typed', e instanceof BMaGlassError && e.status === 502 && e.code === 'request_failed'); }
 }
 
+// --- Retries on transient 502/503/504 (CEO decision 2026-11-15) ---
+// Policy: max 3 attempts total; only idempotent requests are
+// retried (GET/DELETE, or POSTs carrying an Idempotency-Key);
+// backoff is exponential with full jitter.
+{
+  const attemptsFor = (statuses, body = { data: [{ id: 'w1', currency: 'ZMW', balance: 42 }], mode: 'test' }) => {
+    let n = 0;
+    const seenKeys = [];
+    const fetchImpl = stubFetch((url, init) => {
+      n++;
+      seenKeys.push(init?.headers?.['Idempotency-Key']);
+      const status = statuses[Math.min(n - 1, statuses.length - 1)];
+      return { status, body: status >= 400 ? { error: 'unavailable', message: 'try again' } : body };
+    });
+    return { fetchImpl, count: () => n, seenKeys };
+  };
+
+  // (a) A read that 503s twice then answers succeeds on attempt 3.
+  {
+    const stub = attemptsFor([503, 503, 200]);
+    const delays = [];
+    const c = new BMaGlass({ apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', fetchImpl: stub.fetchImpl, retryBaseDelayMs: 100, sleepImpl: async (ms) => { delays.push(ms); } });
+    const wallets = await c.wallets.list();
+    check('retry: read 503x2 then 200 succeeds', wallets[0].balance === 42);
+    check('retry: read took 3 attempts', stub.count() === 3);
+    check('retry: two backoffs, in range', delays.length === 2 && delays[0] >= 0 && delays[0] <= 100 && delays[1] >= 0 && delays[1] <= 200);
+  }
+  // (b) A payment-link create retried after a 503 reuses the SAME
+  // idempotency key — the server replays the original link.
+  {
+    const stub = attemptsFor([503, 201], { data: { id: 'pl1', title: 'Retry Link', amount: 10, currency: 'ZMW', link_code: 'ABC123', status: 'active' }, mode: 'test' });
+    const c = new BMaGlass({ apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', fetchImpl: stub.fetchImpl, retryBaseDelayMs: 0, sleepImpl: async () => {} });
+    const link = await c.paymentLinks.create({ title: 'Retry Link', amount: 10, currency: 'ZMW' });
+    check('retry: keyed create succeeds after 503', link.link_code === 'ABC123');
+    check('retry: keyed create took 2 attempts', stub.count() === 2);
+    check('retry: same auto key on both attempts', !!stub.seenKeys[0] && stub.seenKeys[0] === stub.seenKeys[1]);
+    const stub2 = attemptsFor([503, 201], { data: { id: 'pl1', link_code: 'ABC123' }, mode: 'test' });
+    const c2 = new BMaGlass({ apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', fetchImpl: stub2.fetchImpl, retryBaseDelayMs: 0, sleepImpl: async () => {} });
+    await c2.paymentLinks.create({ title: 'Retry Link', amount: 10 }, 'caller-key-123');
+    check('retry: explicit caller key honoured', stub2.seenKeys[0] === 'caller-key-123' && stub2.seenKeys[1] === 'caller-key-123');
+  }
+  // (c) A 400 is never retried.
+  {
+    const stub = attemptsFor([400]);
+    const c = new BMaGlass({ apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', fetchImpl: stub.fetchImpl, retryBaseDelayMs: 0, sleepImpl: async () => {} });
+    try { await c.wallets.list(); check('retry: 400 not retried', false); }
+    catch (e) { check('retry: 400 not retried', e.status === 400 && stub.count() === 1); }
+  }
+  // (d) simulate-payment has no idempotency key: a 503 is NOT retried.
+  {
+    const stub = attemptsFor([503]);
+    const c = new BMaGlass({ apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', fetchImpl: stub.fetchImpl, retryBaseDelayMs: 0, sleepImpl: async () => {} });
+    try { await c.paymentLinks.simulatePayment('link1'); check('retry: simulate-payment not retried', false); }
+    catch (e) { check('retry: simulate-payment not retried', e.status === 503 && stub.count() === 1); }
+  }
+  // (e) bitcoin/quote has no idempotency key: a 503 is NOT retried.
+  {
+    const stub = attemptsFor([503]);
+    const c = new BMaGlass({ apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', fetchImpl: stub.fetchImpl, retryBaseDelayMs: 0, sleepImpl: async () => {} });
+    try { await c.bitcoin.quote({ side: 'buy', amount_zmw: 100 }); check('retry: bitcoin/quote not retried', false); }
+    catch (e) { check('retry: bitcoin/quote not retried', e.status === 503 && stub.count() === 1); }
+  }
+  // (f) Retries off (maxRetries 0): a 503 fails on the first attempt.
+  {
+    const stub = attemptsFor([503, 200]);
+    const c = new BMaGlass({ apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', fetchImpl: stub.fetchImpl, maxRetries: 0, retryBaseDelayMs: 0, sleepImpl: async () => {} });
+    try { await c.wallets.list(); check('retry: maxRetries 0 means one attempt', false); }
+    catch (e) { check('retry: maxRetries 0 means one attempt', e.status === 503 && stub.count() === 1); }
+  }
+  // (g) A transport failure on a read is retried, then surfaces typed.
+  {
+    let n = 0;
+    const c = new BMaGlass({ apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', retryBaseDelayMs: 0, sleepImpl: async () => {}, fetchImpl: async () => { n++; throw new TypeError('fetch failed'); } });
+    try { await c.wallets.list(); check('retry: transport failure retried', false); }
+    catch (e) { check('retry: transport failure retried', e instanceof BMaGlassError && e.code === 'network_error' && n === 3); }
+  }
+  // (h) Invoices also carry an auto key on every create.
+  {
+    const stub = attemptsFor([201], { data: { id: 'inv1', status: 'open' }, mode: 'test' });
+    const c = new BMaGlass({ apiKey: 'bmp_test_contract', baseUrl: 'http://local.test', fetchImpl: stub.fetchImpl, retryBaseDelayMs: 0, sleepImpl: async () => {} });
+    await c.invoices.create({ amount: 10, currency: 'ZMW' });
+    check('retry: invoice create carries an auto key', !!stub.seenKeys[0]);
+  }
+}
+
 console.log(failures === 0 ? '\nALL REACT NATIVE SDK TESTS PASSED' : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

@@ -9,7 +9,7 @@
  * wallet. The environment is read from the key alone (client.environment);
  * no option can override it.
  */
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
 export class BMaGlassError extends Error {
   constructor(
@@ -52,6 +52,31 @@ export interface BMaGlassOptions {
    *  does not settle in time fails as a BMaGlassError with code
    *  "network_error" instead of hanging forever. */
   timeoutMs?: number;
+  /** Retries after a transient failure (default 2 — 3 attempts total).
+   *  Only idempotent requests are ever retried: every GET/DELETE, and
+   *  POSTs that carry an Idempotency-Key (payment-link / invoice /
+   *  transfer creates — the SDK sends one per logical call, see
+   *  `newIdempotencyKey` — and mobile-money collections, keyed by
+   *  reference / idempotency_key). A POST with no idempotency key
+   *  (bitcoin/quote, simulate-payment, webhook create/test) is never
+   *  retried: the server could not tell a retry from a second call.
+   *  Retried failures are HTTP 502/503/504 and transport failures
+   *  (including timeouts). Backoff is exponential with full jitter:
+   *  before retry N the client sleeps a uniform random delay in
+   *  [0, min(4000, retryBaseDelayMs * 2^(N-1))] ms. Set to 0 to
+   *  disable retries entirely. */
+  maxRetries?: number;
+  /** Base backoff in milliseconds (default 500). See maxRetries. */
+  retryBaseDelayMs?: number;
+  /** Sleep implementation (tests). Defaults to setTimeout. */
+  sleepImpl?: (ms: number) => Promise<void>;
+}
+
+/** One fresh idempotency key per logical create. The same key is
+ *  reused across that call's retries, so the server replays the
+ *  original object instead of creating a second one. */
+export function newIdempotencyKey(): string {
+  return randomUUID();
 }
 
 export const SITE_BASE = "https://bmaglasspay.online";
@@ -88,6 +113,9 @@ export class BMaGlass {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
   private readonly timeoutMs: number;
+  private readonly maxRetries: number;
+  private readonly retryBaseDelayMs: number;
+  private readonly sleepImpl: (ms: number) => Promise<void>;
 
   constructor(options: BMaGlassOptions) {
     if (!/^(bmg|bmp)_/.test(options.apiKey ?? "")) {
@@ -99,9 +127,39 @@ export class BMaGlass {
     this.baseUrl = (options.baseUrl ?? DEFAULT_BASE).replace(/\/$/, "");
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.timeoutMs = options.timeoutMs ?? 30000;
+    this.maxRetries = options.maxRetries ?? 2;
+    this.retryBaseDelayMs = options.retryBaseDelayMs ?? 500;
+    this.sleepImpl = options.sleepImpl ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  }
+
+  /** Backoff before retry N (1-based): uniform in [0, cap] ms, cap
+   *  doubling from retryBaseDelayMs up to 4000 ms. */
+  private retryDelayMs(attempt: number): number {
+    return Math.random() * Math.min(4000, this.retryBaseDelayMs * 2 ** (attempt - 1));
   }
 
   private async request<T>(method: string, path: string, body?: unknown, headers: Record<string, string> = {}): Promise<T> {
+    // Retryable iff the request is provably safe to repeat: a read, a
+    // delete, or a write carrying an Idempotency-Key (the server
+    // replays the original object for a repeated key). Anything else
+    // gets exactly one attempt — a blind retry could double-settle.
+    const retryable = method === "GET" || method === "DELETE" || headers["Idempotency-Key"] !== undefined;
+    const maxAttempts = retryable ? Math.max(1, this.maxRetries + 1) : 1;
+    let attempt = 0;
+    for (;;) {
+      attempt++;
+      try {
+        return await this.requestOnce<T>(method, path, body, headers);
+      } catch (e: any) {
+        const transient = e instanceof BMaGlassError &&
+          (e.code === "network_error" || e.status === 502 || e.status === 503 || e.status === 504);
+        if (!transient || attempt >= maxAttempts) throw e;
+        await this.sleepImpl(this.retryDelayMs(attempt));
+      }
+    }
+  }
+
+  private async requestOnce<T>(method: string, path: string, body?: unknown, headers: Record<string, string> = {}): Promise<T> {
     let res: Response;
     try {
       // Timeout is enforced TWO ways: the signal aborts a real fetch
@@ -158,8 +216,8 @@ export class BMaGlass {
   invoices = {
     list: () => this.request<Invoice[]>("GET", "invoices"),
     get: (id: string) => this.request<Invoice>("GET", `invoices/${encodeURIComponent(id)}`),
-    create: (input: { amount: number; currency?: string; description?: string; customer_email?: string; metadata?: Record<string, unknown> }) =>
-      this.request<Invoice>("POST", "invoices", input),
+    create: (input: { amount: number; currency?: string; description?: string; customer_email?: string; metadata?: Record<string, unknown> }, idempotencyKey?: string) =>
+      this.request<Invoice>("POST", "invoices", input, { "Idempotency-Key": idempotencyKey ?? newIdempotencyKey() }),
     /** Sandbox only: drive a sandbox invoice to paid (fires invoice.paid, flagged simulated). Production keys get 403 simulation_not_available. */
     simulatePayment: (id: string) => this.request<Invoice & { simulated?: boolean }>("POST", `invoices/${encodeURIComponent(id)}/simulate-payment`),
   };
@@ -170,23 +228,24 @@ export class BMaGlass {
     list: (limit = 25) => this.request<Transaction[]>("GET", `transactions?limit=${Math.max(1, Math.min(100, limit))}`),
   };
   transfers = {
-    /** Production keys only. Sandbox keys receive a 403 test_mode_read_only BMaGlassError. */
+    /** Production keys only. Sandbox keys receive a 403 test_mode_read_only BMaGlassError. Retried safely: one Idempotency-Key per logical call (caller-supplied, or auto-generated) is reused across retries, and the server replays the original transfer. */
     create: (input: { to_user_id: string; amount: number; currency?: string; description?: string; recipient_name?: string }, idempotencyKey?: string) =>
       this.request<{ transaction_id: string; new_sender_balance: number }>("POST", "transfers",
         { ...input, currency: assertSupportedCurrency(input.currency ?? "ZMW") },
-        idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
+        { "Idempotency-Key": idempotencyKey ?? newIdempotencyKey() }),
   };
   paymentLinks = {
     list: () => this.request<PaymentLink[]>("GET", "payment-links"),
     /** One link by UUID id or link_code. The list caps at 100 (newest first); this read is how a shop reconciler verifies an older link. */
     get: (id: string) => this.request<PaymentLink>("GET", `payment-links/${encodeURIComponent(id)}`),
-    /** Creates a link in the key's environment; a sandbox key creates a sandbox link (the hosted checkout refuses those — settlement is simulation-only). `fee_payer` overrides the merchant default from GET /settings for this link only ("seller" — the fee comes out of what the seller receives; "buyer" — the fee is added on top and the seller receives the full price). `redirect_url` is the buyer return URL the hosted pay page offers after payment. */
-    create: (input: { title: string; description?: string; amount?: number; currency?: string; expires_at?: string; fee_payer?: "seller" | "buyer"; redirect_url?: string }) => {
+    /** Creates a link in the key's environment; a sandbox key creates a sandbox link (the hosted checkout refuses those — settlement is simulation-only). `fee_payer` overrides the merchant default from GET /settings for this link only ("seller" — the fee comes out of what the seller receives; "buyer" — the fee is added on top and the seller receives the full price). `redirect_url` is the buyer return URL the hosted pay page offers after payment. Retried safely: one Idempotency-Key per logical call (caller-supplied, or auto-generated) is reused across retries, and the server replays the original link instead of creating a second one. */
+    create: (input: { title: string; description?: string; amount?: number; currency?: string; expires_at?: string; fee_payer?: "seller" | "buyer"; redirect_url?: string }, idempotencyKey?: string) => {
       if (input.fee_payer !== undefined && input.fee_payer !== "seller" && input.fee_payer !== "buyer") {
         throw new BMaGlassError(0, "invalid_fee_payer", "fee_payer must be 'seller' or 'buyer'.");
       }
       return this.request<PaymentLink>("POST", "payment-links",
-        { ...input, currency: assertSupportedCurrency(input.currency ?? "ZMW") });
+        { ...input, currency: assertSupportedCurrency(input.currency ?? "ZMW") },
+        { "Idempotency-Key": idempotencyKey ?? newIdempotencyKey() });
     },
     /** A link's Bitcoin payment attempts (quote, sats received, status). */
     attempts: (id: string) => this.request<PaymentLinkAttempt[]>("GET", `payment-links/${encodeURIComponent(id)}/attempts`),
@@ -210,8 +269,16 @@ export class BMaGlass {
      * business is not registered in Zambia, or mobile money is
      * switched off) / business_inactive.
      */
-    createCollection: (input: { amount: number; phone: string; operator?: "mtn" | "airtel" | "zamtel"; reference?: string; idempotency_key?: string }) =>
-      this.request<MobileMoneyCollection>("POST", "mobile-money/collections", input),
+    createCollection: (input: { amount: number; phone: string; operator?: "mtn" | "airtel" | "zamtel"; reference?: string; idempotency_key?: string }) => {
+      // Retried safely: the effective key is the caller's
+      // idempotency_key, else their reference (which doubles as the
+      // key server-side), else a fresh UUID sent as idempotency_key.
+      // The same key rides every retry of this logical call.
+      const key = input.idempotency_key ?? input.reference ?? newIdempotencyKey();
+      const body: Record<string, unknown> = { ...input };
+      if (input.idempotency_key === undefined && input.reference === undefined) body.idempotency_key = key;
+      return this.request<MobileMoneyCollection>("POST", "mobile-money/collections", body, { "Idempotency-Key": key });
+    },
     /**
      * A collection's current state, by platform reference (BMG-…) or
      * your own reference. Polling refreshes from the rail: when the
@@ -229,7 +296,7 @@ export class BMaGlass {
   bitcoin = {
     balance: () => this.request<Array<{ asset: string; balance_sats: number; available_sats: number; updated_at: string }>>("GET", "bitcoin/balance"),
     depositAddress: () => this.request<{ address: string; derivation_path: string; is_active: boolean; created_at: string }>("GET", "bitcoin/deposit-address"),
-    /** Quote only — execution happens in the app. Works with sandbox keys. `side` must be "buy" or "sell": a typo here used to be silently treated as a buy quote, which flips the money direction. */
+    /** Quote only — execution happens in the app. Works with sandbox keys. `side` must be "buy" or "sell": a typo here used to be silently treated as a buy quote, which flips the money direction. Not retried: each call mints a quote row (no idempotency key), so a retry after a 503 would mint a second quote. */
     quote: (input: { side: "buy" | "sell"; amount_zmw?: number; amount_sats?: number }) => {
       if (input.side !== "buy" && input.side !== "sell") {
         throw new BMaGlassError(0, "invalid_side", "side must be 'buy' or 'sell'.");

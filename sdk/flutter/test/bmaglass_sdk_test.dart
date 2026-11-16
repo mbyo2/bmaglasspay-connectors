@@ -323,4 +323,184 @@ void main() {
       expect(coll['fee_bearer'], 'seller');
     });
   });
+
+  group('retries on transient 502/503/504 (CEO decision 2026-11-15)', () {
+    // Policy: max 3 attempts total; only idempotent requests are
+    // retried (GET/DELETE, or POSTs carrying an Idempotency-Key);
+    // backoff is exponential with full jitter. Each test scripts its
+    // own MockClient and counts attempts from the closure.
+    test('read 503 twice then 200 succeeds on the third attempt', () async {
+      var n = 0;
+      final delays = <Duration>[];
+      final mock = MockClient((req) async {
+        n++;
+        if (n <= 2) return http.Response(jsonEncode({'error': 'unavailable', 'message': 'try again'}), 503);
+        return http.Response(
+            jsonEncode({'data': [{'id': 'w1', 'currency': 'ZMW', 'balance': 42}], 'mode': 'test'}), 200);
+      });
+      final client = BMaGlass(
+          apiKey: 'bmp_test_contract',
+          baseUrl: 'http://local.test',
+          httpClient: mock,
+          retryBaseDelay: const Duration(milliseconds: 100),
+          sleeper: (d) async { delays.add(d); });
+      final wallets = await client.wallets();
+      expect(wallets.single.balance, 42);
+      expect(n, 3);
+      expect(delays.length, 2);
+      expect(delays[0].inMilliseconds, inInclusiveRange(0, 100));
+      expect(delays[1].inMilliseconds, inInclusiveRange(0, 200));
+    });
+
+    test('keyed create reuses the same idempotency key across retries', () async {
+      var n = 0;
+      final keys = <String?>[];
+      final mock = MockClient((req) async {
+        n++;
+        keys.add(req.headers['idempotency-key']);
+        if (n == 1) return http.Response(jsonEncode({'error': 'unavailable', 'message': 'try again'}), 503);
+        return http.Response(
+            jsonEncode({
+              'data': {
+                'id': 'pl1', 'title': 'Retry Link', 'amount': 10, 'currency': 'ZMW',
+                'link_code': 'ABC123', 'status': 'active', 'fee_payer': 'seller',
+                'redirect_url': null, 'payment_count': 0, 'total_collected': 0,
+                'fee_amount': 0.25, 'buyer_total': 10, 'seller_receives': 9.75,
+              },
+              'mode': 'test'
+            }),
+            201);
+      });
+      final client = BMaGlass(
+          apiKey: 'bmp_test_contract',
+          baseUrl: 'http://local.test',
+          httpClient: mock,
+          retryBaseDelay: Duration.zero,
+          sleeper: (d) async {});
+      final link = await client.createPaymentLink(title: 'Retry Link', amount: 10, currency: 'ZMW');
+      expect(link.linkCode, 'ABC123');
+      expect(n, 2);
+      expect(keys[0], isNotNull);
+      expect(keys[0], keys[1], reason: 'same key on the retry');
+      // An explicit caller key is honoured verbatim, not replaced.
+      var n2 = 0;
+      final keys2 = <String?>[];
+      final mock2 = MockClient((req) async {
+        n2++;
+        keys2.add(req.headers['idempotency-key']);
+        if (n2 == 1) return http.Response(jsonEncode({'error': 'unavailable', 'message': 'try again'}), 503);
+        return http.Response(
+            jsonEncode({
+              'data': {
+                'id': 'pl1', 'title': 'Retry Link', 'amount': 10, 'currency': 'ZMW',
+                'link_code': 'ABC123', 'status': 'active', 'fee_payer': 'seller',
+                'redirect_url': null, 'payment_count': 0, 'total_collected': 0,
+                'fee_amount': 0.25, 'buyer_total': 10, 'seller_receives': 9.75,
+              },
+              'mode': 'test'
+            }),
+            201);
+      });
+      final client2 = BMaGlass(
+          apiKey: 'bmp_test_contract',
+          baseUrl: 'http://local.test',
+          httpClient: mock2,
+          retryBaseDelay: Duration.zero,
+          sleeper: (d) async {});
+      await client2.createPaymentLink(title: 'Retry Link', amount: 10, idempotencyKey: 'caller-key-123');
+      expect(keys2, ['caller-key-123', 'caller-key-123']);
+    });
+
+    test('a 400 is never retried', () async {
+      var n = 0;
+      final mock = MockClient((req) async {
+        n++;
+        return http.Response(jsonEncode({'error': 'invalid_request', 'message': 'bad'}), 400);
+      });
+      final client = BMaGlass(
+          apiKey: 'bmp_test_contract',
+          baseUrl: 'http://local.test',
+          httpClient: mock,
+          retryBaseDelay: Duration.zero,
+          sleeper: (d) async {});
+      try {
+        await client.wallets();
+        fail('should have thrown');
+      } on BMaGlassException catch (e) {
+        expect(e.status, 400);
+        expect(n, 1);
+      }
+    });
+
+    test('simulate-payment and quote are not retried (no idempotency key)', () async {
+      // simulate-payment would double-count; quote would mint two rows.
+      var n = 0;
+      final mock = MockClient((req) async {
+        n++;
+        return http.Response(jsonEncode({'error': 'unavailable', 'message': 'try again'}), 503);
+      });
+      final client = BMaGlass(
+          apiKey: 'bmp_test_contract',
+          baseUrl: 'http://local.test',
+          httpClient: mock,
+          retryBaseDelay: Duration.zero,
+          sleeper: (d) async {});
+      try {
+        await client.simulatePaymentLinkPayment('link1');
+        fail('should have thrown');
+      } on BMaGlassException catch (e) {
+        expect(e.status, 503);
+        expect(n, 1);
+      }
+      n = 0;
+      try {
+        await client.bitcoinQuote(side: 'buy', amountZmw: 100);
+        fail('should have thrown');
+      } on BMaGlassException catch (e) {
+        expect(e.status, 503);
+        expect(n, 1);
+      }
+    });
+
+    test('maxRetries 0 means one attempt', () async {
+      var n = 0;
+      final mock = MockClient((req) async {
+        n++;
+        if (n == 1) return http.Response(jsonEncode({'error': 'unavailable', 'message': 'try again'}), 503);
+        return http.Response(
+            jsonEncode({'data': [{'id': 'w1', 'currency': 'ZMW', 'balance': 42}], 'mode': 'test'}), 200);
+      });
+      final client = BMaGlass(
+          apiKey: 'bmp_test_contract',
+          baseUrl: 'http://local.test',
+          httpClient: mock,
+          maxRetries: 0,
+          retryBaseDelay: Duration.zero,
+          sleeper: (d) async {});
+      try {
+        await client.wallets();
+        fail('should have thrown');
+      } on BMaGlassException catch (e) {
+        expect(e.status, 503);
+        expect(n, 1);
+      }
+    });
+
+    test('invoice create carries an auto idempotency key', () async {
+      String? key;
+      final mock = MockClient((req) async {
+        key = req.headers['idempotency-key'];
+        return http.Response(
+            jsonEncode({'data': {'id': 'inv1', 'status': 'open'}, 'mode': 'test'}), 201);
+      });
+      final client = BMaGlass(
+          apiKey: 'bmp_test_contract',
+          baseUrl: 'http://local.test',
+          httpClient: mock,
+          retryBaseDelay: Duration.zero,
+          sleeper: (d) async {});
+      await client.createInvoice(amount: 10, currency: 'ZMW');
+      expect(key, isNotNull);
+    });
+  });
 }

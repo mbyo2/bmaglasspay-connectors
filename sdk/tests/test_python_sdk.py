@@ -238,6 +238,115 @@ class ExtHuntFixesTest(unittest.TestCase):
             assert_supported_currency("EUR")
 
 
+class RetryTest(unittest.TestCase):
+    """Retries on transient 502/503/504 (CEO decision 2026-11-15):
+    max 3 attempts total; only idempotent requests are retried
+    (GET/DELETE, or POSTs carrying an Idempotency-Key); backoff is
+    exponential with full jitter."""
+
+    class ScriptedSession:
+        """Returns scripted statuses in order, then repeats the last."""
+        def __init__(self, statuses, payload=None):
+            self.statuses = statuses
+            self.payload = payload or {"data": [{"id": "w1", "currency": "ZMW", "balance": 42}]}
+            self.calls = []
+
+        def request(self, method, url, headers=None, data=None, timeout=None):
+            self.calls.append({"method": method, "url": url, "headers": headers, "data": data})
+            n = len(self.calls)
+            status = self.statuses[min(n - 1, len(self.statuses) - 1)]
+            if status >= 400:
+                return FakeResponse(status, {"error": "unavailable", "message": "try again"})
+            return FakeResponse(status, self.payload)
+
+    def setUp(self):
+        self.delays = []
+
+    def _client(self, session, **kw):
+        kw.setdefault("retry_base_delay", 0)
+        kw.setdefault("sleep", self.delays.append)
+        return BMaGlass("bmp_test_contract", base_url="http://local.test", session=session, **kw)
+
+    def test_read_503_twice_then_200_succeeds_on_third_attempt(self):
+        session = self.ScriptedSession([503, 503, 200])
+        client = self._client(session, retry_base_delay=0.1)
+        wallets = client.wallets.list()
+        self.assertEqual(wallets[0]["balance"], 42)
+        self.assertEqual(len(session.calls), 3)
+        self.assertEqual(len(self.delays), 2)
+        self.assertTrue(0 <= self.delays[0] <= 0.1)
+        self.assertTrue(0 <= self.delays[1] <= 0.2)
+
+    def test_keyed_create_reuses_same_idempotency_key(self):
+        payload = {"data": {"id": "pl1", "title": "Retry Link", "amount": 10,
+                            "currency": "ZMW", "link_code": "ABC123", "status": "active"}}
+        session = self.ScriptedSession([503, 201], payload)
+        client = self._client(session)
+        link = client.payment_links.create("Retry Link", amount=10, currency="ZMW")
+        self.assertEqual(link["link_code"], "ABC123")
+        self.assertEqual(len(session.calls), 2)
+        keys = [c["headers"]["Idempotency-Key"] for c in session.calls]
+        self.assertTrue(keys[0])
+        self.assertEqual(keys[0], keys[1], "same key on the retry")
+        # An explicit caller key is honoured verbatim, not replaced.
+        session2 = self.ScriptedSession([503, 201], payload)
+        client2 = self._client(session2)
+        client2.payment_links.create("Retry Link", amount=10, idempotency_key="caller-key-123")
+        self.assertEqual([c["headers"]["Idempotency-Key"] for c in session2.calls],
+                         ["caller-key-123", "caller-key-123"])
+
+    def test_400_is_not_retried(self):
+        session = self.ScriptedSession([400])
+        client = self._client(session)
+        with self.assertRaises(BMaGlassError) as ctx:
+            client.wallets.list()
+        self.assertEqual(ctx.exception.status, 400)
+        self.assertEqual(len(session.calls), 1)
+
+    def test_simulate_payment_and_quote_are_not_retried(self):
+        # Neither carries an idempotency key: a 503 must not be retried
+        # (simulate-payment would double-count; quote would mint two rows).
+        session = self.ScriptedSession([503])
+        client = self._client(session)
+        with self.assertRaises(BMaGlassError):
+            client.payment_links.simulate_payment("link1")
+        self.assertEqual(len(session.calls), 1)
+        session2 = self.ScriptedSession([503])
+        client2 = self._client(session2)
+        with self.assertRaises(BMaGlassError):
+            client2.bitcoin.quote("buy", amount_zmw=100)
+        self.assertEqual(len(session2.calls), 1)
+
+    def test_max_retries_zero_means_one_attempt(self):
+        session = self.ScriptedSession([503, 200])
+        client = self._client(session, max_retries=0)
+        with self.assertRaises(BMaGlassError) as ctx:
+            client.wallets.list()
+        self.assertEqual(ctx.exception.status, 503)
+        self.assertEqual(len(session.calls), 1)
+
+    def test_transport_failure_on_read_is_retried(self):
+        class Boom(requests.Session):
+            def __init__(self):
+                self.calls = 0
+            def request(self, *a, **k):
+                self.calls += 1
+                raise requests.ConnectionError("boom")
+        boom = Boom()
+        client = self._client(boom)
+        with self.assertRaises(BMaGlassError) as ctx:
+            client.wallets.list()
+        self.assertEqual(ctx.exception.code, "network_error")
+        self.assertEqual(boom.calls, 3)
+
+    def test_invoice_create_carries_auto_key(self):
+        payload = {"data": {"id": "inv1", "status": "open"}}
+        session = self.ScriptedSession([201], payload)
+        client = self._client(session)
+        client.invoices.create(10, currency="ZMW")
+        self.assertTrue(session.calls[0]["headers"]["Idempotency-Key"])
+
+
 class WebhookVerifyTest(unittest.TestCase):
     RAW = b'{"id":"evt_1","type":"webhook.test","created":"2026-10-26T00:00:00.000Z","data":{"ping":true}}'
     SIG = "sha256=ff522c97ada5bfd4f6c09a0457823f89546896708e8e1f5bbb72d2ad59d68535"

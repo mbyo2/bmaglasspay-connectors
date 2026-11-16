@@ -23,3 +23,26 @@ money. Every SDK exposes `environment` (derived from the key only) plus `connect
 simulate-payment methods. A live conformance runner lives at `tests/conformance.live.mjs` (QA keys
 via environment variables). Honest limits: sandbox keys can never move real money. The SDKs are
 in-repo only; they are not published to npm, PyPI, Packagist or pub.dev yet.
+
+## Retries on transient 502/503/504 (all five SDKs)
+
+On by default: up to 3 attempts total (the first call + 2 retries), exponential backoff with full
+jitter — before retry N the client sleeps a uniform random delay in `[0, min(4000, base · 2^(N-1))]`
+ms (base 500 ms). Only failures that are safe to repeat are retried: HTTP 502/503/504 and
+transport failures (including timeouts), and only on requests that are provably idempotent:
+
+- every GET and DELETE;
+- POSTs that carry an Idempotency-Key: payment-link creates, invoice creates, transfer creates
+  (the SDK sends one key per logical call — caller-supplied, or auto-generated — and reuses it
+  across retries, so the server replays the original object instead of creating a second one),
+  and mobile-money collections (keyed by the caller's `idempotency_key`, else their `reference`,
+  else an auto-generated key).
+
+Never retried: `bitcoin/quote` (each call mints a quote row — a retry would mint a second quote),
+`simulate-payment` (replaying it would double-count the simulated payment), and webhook
+create/test (no idempotency key). A 4xx is never retried either — the request itself is wrong.
+
+Disable per client: TypeScript / React Native `new BMaGlass({ ..., maxRetries: 0 })`; Python
+`BMaGlass(..., max_retries=0)`; PHP `new Client(..., $options = ['max_retries' => 0])`; Flutter
+`BMaGlass(..., maxRetries: 0)`. The base delay is adjustable the same way (`retryBaseDelayMs` /
+`retry_base_delay` (seconds) / `retry_base_delay_ms` / `retryBaseDelay`).

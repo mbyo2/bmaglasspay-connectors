@@ -18,7 +18,7 @@ Release version: **1.0.0**. Validated against the UNZIPPED zip contents (not the
 - OK bmaglasspay-magento-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-magento-1.0.0.zip: no bytecode
 - OK bmaglasspay-magento-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-magento-1.0.0.zip: 18528 bytes, sha256 `fc73ded9eca28a813c866b85301f8fa4a1e3820d2e1e9aa0e9dcc7d2677f4869`, 16 files
+  - bmaglasspay-magento-1.0.0.zip: 20023 bytes, sha256 `8cb835f3189678062574238903caa80339761554e120b1a65811505fc792cda7`, 16 files
 - OK bmaglasspay-odoo-16.0-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-odoo-16.0-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-odoo-16.0-1.0.0.zip: no bytecode
@@ -48,52 +48,52 @@ Release version: **1.0.0**. Validated against the UNZIPPED zip contents (not the
 - OK bmaglasspay-opencart-3-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-opencart-3-1.0.0.zip: no bytecode
 - OK bmaglasspay-opencart-3-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-opencart-3-1.0.0.zip: 16317 bytes, sha256 `283ca97bef81545880b7dc5ed278be7330ab4632461a2e90c4f980ff4ce44eb9`, 11 files
+  - bmaglasspay-opencart-3-1.0.0.zip: 17811 bytes, sha256 `2fd2f5c155ced2d5e252d4d698efb7a298cd982ce655966a3c69c8f8c6c7cc96`, 11 files
 - OK bmaglasspay-opencart-4-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-opencart-4-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-opencart-4-1.0.0.zip: no bytecode
 - OK bmaglasspay-opencart-4-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-opencart-4-1.0.0.zip: 16760 bytes, sha256 `4658354c6f72f2bb99290b2c9d259951df605ddc6ee8fdff6e3ed2f1de1055a6`, 11 files
+  - bmaglasspay-opencart-4-1.0.0.zip: 18254 bytes, sha256 `2c3ab1aeb067ea389b8049b1ed502047573af5b951bbad06b080019e824dbde4`, 11 files
 - OK bmaglasspay-prestashop-1.7-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-prestashop-1.7-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-prestashop-1.7-1.0.0.zip: no bytecode
 - OK bmaglasspay-prestashop-1.7-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-prestashop-1.7-1.0.0.zip: 14261 bytes, sha256 `336e296d5fc33630262707af7576433f357b1ff6e0e745debec5d69b629e8789`, 8 files
+  - bmaglasspay-prestashop-1.7-1.0.0.zip: 15755 bytes, sha256 `638978e363c796694400e5644c6d3f42c8b843cae82048b96e66389693783d60`, 8 files
 - OK bmaglasspay-prestashop-8-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-prestashop-8-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-prestashop-8-1.0.0.zip: no bytecode
 - OK bmaglasspay-prestashop-8-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-prestashop-8-1.0.0.zip: 14231 bytes, sha256 `c1d51d57e38033e77f041855d155a235e5f86b3c4fa4e4f0436c2737f861879b`, 8 files
+  - bmaglasspay-prestashop-8-1.0.0.zip: 15725 bytes, sha256 `5897a29dcb2061437901ef1c09d4c50f748c1c7139508a8e23162680f26b9861`, 8 files
 - OK bmaglasspay-prestashop-9-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-prestashop-9-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-prestashop-9-1.0.0.zip: no bytecode
 - OK bmaglasspay-prestashop-9-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-prestashop-9-1.0.0.zip: 14585 bytes, sha256 `8a6ef738dc4244224a369bc6d9915c2fd9bc72705eedea9d4667bbb75dd7a0e6`, 9 files
+  - bmaglasspay-prestashop-9-1.0.0.zip: 16079 bytes, sha256 `d0e3fa9619572f3d6dd4e2788ed6cb1bc66c490414617815ff70310184ab61e1`, 9 files
 - OK bmaglasspay-sdk-flutter-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-sdk-flutter-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-flutter-1.0.0.zip: no bytecode
 - OK bmaglasspay-sdk-flutter-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-sdk-flutter-1.0.0.zip: 14097 bytes, sha256 `0b5ebc610095a37d2407c3ac37b078ddf91af9e7eeeae3bac3b2092943a4fdd4`, 9 files
+  - bmaglasspay-sdk-flutter-1.0.0.zip: 16781 bytes, sha256 `25cede8a016e082295acc79959c05c27130d53207ee3be0e31c312db6d7bc0ed`, 9 files
 - OK bmaglasspay-sdk-php-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-sdk-php-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-php-1.0.0.zip: no bytecode
 - OK bmaglasspay-sdk-php-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-sdk-php-1.0.0.zip: 13319 bytes, sha256 `d84424003fef04d359ddfc93ebdb5502d3f39d610d172f8dfc6c3a8731f888f5`, 6 files
+  - bmaglasspay-sdk-php-1.0.0.zip: 16506 bytes, sha256 `47ffff62bc7cc42385a98c2243f7ed0892c896108937aa6e8a7c0890101b2b31`, 6 files
 - OK bmaglasspay-sdk-python-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-sdk-python-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-python-1.0.0.zip: no bytecode
 - OK bmaglasspay-sdk-python-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-sdk-python-1.0.0.zip: 5769 bytes, sha256 `4c320ca7a0e55d420fd10c0d2d1e6d25dc4a91ef17afc30f0cc3abf75429214a`, 4 files
+  - bmaglasspay-sdk-python-1.0.0.zip: 7431 bytes, sha256 `05257f2bfdf05590769dfd53f6b06a59a708369a408e990e84743252442079ef`, 4 files
 - OK bmaglasspay-sdk-react-native-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-sdk-react-native-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-react-native-1.0.0.zip: no bytecode
 - OK bmaglasspay-sdk-react-native-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-sdk-react-native-1.0.0.zip: 14311 bytes, sha256 `91436a1052f87b4f599aaca1f8d3d4a83d45bc7c4ae350b09343e3a2d06bc959`, 7 files
+  - bmaglasspay-sdk-react-native-1.0.0.zip: 17159 bytes, sha256 `c6df1f3f8e2a71d6c74e495eabc16f9283e4b7d5ffc8737c0b0fb38a1d5fa62a`, 7 files
 - OK bmaglasspay-sdk-typescript-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-sdk-typescript-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-sdk-typescript-1.0.0.zip: no bytecode
 - OK bmaglasspay-sdk-typescript-1.0.0.zip: no key-like secrets (none found)
-  - bmaglasspay-sdk-typescript-1.0.0.zip: 17749 bytes, sha256 `4530e35c89847594b4ca8606335b0057f4f3db7cee891974f61557123db25864`, 8 files
+  - bmaglasspay-sdk-typescript-1.0.0.zip: 20980 bytes, sha256 `40a7f03de59a512c7ab3cb9698e5f89eddae854f3b4c66a2ddbe4831cf0875af`, 8 files
 - OK bmaglasspay-woocommerce-1.0.0.zip: archive integrity (clean)
 - OK bmaglasspay-woocommerce-1.0.0.zip: no absolute/parent paths
 - OK bmaglasspay-woocommerce-1.0.0.zip: no bytecode
@@ -475,7 +475,6 @@ PASS  network_error message hides the curl detail
 PASS  webhook delete returns
 
 ALL PHP CLIENT TESTS PASSED
-PHP Warning:  PHP Startup: Unable to load dynamic library 'pdo_mysql.so' (tried: /usr/lib/php/20230831/pdo_mysql.so (/usr/lib/php/20230831/pdo_mysql.so: undefined symbol: pdo_parse_params), /usr/lib/php/20230831/pdo_mysql.so.so (/usr/lib/php/20230831/pdo_mysql.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
 ```
 - run-blocks-tests.php: rc=0, 30 PASS / 0 FAIL (expected 30 PASS / 0 FAIL)
 ```
@@ -511,7 +510,6 @@ PASS  bootstrap registers the momo Blocks script handle
 PASS  bootstrap handles the mobile money settlement webhook event
 
 ALL PASS
-PHP Warning:  PHP Startup: Unable to load dynamic library 'pdo_mysql.so' (tried: /usr/lib/php/20230831/pdo_mysql.so (/usr/lib/php/20230831/pdo_mysql.so: undefined symbol: pdo_parse_params), /usr/lib/php/20230831/pdo_mysql.so.so (/usr/lib/php/20230831/pdo_mysql.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
 ```
 - run-reconciler-tests.php: rc=0, 26 PASS / 0 FAIL (expected 26 PASS / 0 FAIL)
 ```
@@ -543,7 +541,6 @@ PASS  cron with a sandbox key reconciles the paid link order
 PASS  cron with a sandbox key reconciles the settled MoMo order
 
 ALL PASS
-PHP Warning:  PHP Startup: Unable to load dynamic library 'pdo_mysql.so' (tried: /usr/lib/php/20230831/pdo_mysql.so (/usr/lib/php/20230831/pdo_mysql.so: undefined symbol: pdo_parse_params), /usr/lib/php/20230831/pdo_mysql.so.so (/usr/lib/php/20230831/pdo_mysql.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
 ```
 - run-momo-gateway-tests.php: rc=0, 30 PASS / 0 FAIL (expected 30 PASS / 0 FAIL)
 ```
@@ -578,7 +575,6 @@ PASS  confirmed note quotes the charged K101.00
 PASS  blocks data carries fee_bearer buyer
 PASS  blocks data carries fee_bearer seller
 MoMo gateway fee-bearer <redacted> ALL PASS
-PHP Warning:  PHP Startup: Unable to load dynamic library 'pdo_mysql.so' (tried: /usr/lib/php/20230831/pdo_mysql.so (/usr/lib/php/20230831/pdo_mysql.so: undefined symbol: pdo_parse_params), /usr/lib/php/20230831/pdo_mysql.so.so (/usr/lib/php/20230831/pdo_mysql.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
 ```
 - run-gateway-tests.php: rc=0, 47 PASS / 0 FAIL (expected 47 PASS / 0 FAIL)
 ```
@@ -631,7 +627,6 @@ PASS  failed feature read returns empty
 PASS  failed feature read is retried, not served from cache
 
 ALL GATEWAY TESTS PASSED
-PHP Warning:  PHP Startup: Unable to load dynamic library 'pdo_mysql.so' (tried: /usr/lib/php/20230831/pdo_mysql.so (/usr/lib/php/20230831/pdo_mysql.so: undefined symbol: pdo_parse_params), /usr/lib/php/20230831/pdo_mysql.so.so (/usr/lib/php/20230831/pdo_mysql.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
 ```
 - run-webhook-tests.php: rc=0, 36 PASS / 0 FAIL (expected 36 PASS / 0 FAIL)
 ```
@@ -673,7 +668,6 @@ PASS  transaction.completed answers 200
 PASS  transaction.completed touches no order
 
 ALL WEBHOOK TESTS PASSED
-PHP Warning:  PHP Startup: Unable to load dynamic library 'pdo_mysql.so' (tried: /usr/lib/php/20230831/pdo_mysql.so (/usr/lib/php/20230831/pdo_mysql.so: undefined symbol: pdo_parse_params), /usr/lib/php/20230831/pdo_mysql.so.so (/usr/lib/php/20230831/pdo_mysql.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
 ```
 - run-uninstall-tests.php: rc=0, 11 PASS / 0 FAIL (expected 11 PASS / 0 FAIL)
 ```
@@ -690,7 +684,6 @@ PASS  missing settings uninstall cleanly
 PASS  corrupted settings uninstall cleanly
 
 ALL UNINSTALL TESTS PASSED
-PHP Warning:  PHP Startup: Unable to load dynamic library 'pdo_mysql.so' (tried: /usr/lib/php/20230831/pdo_mysql.so (/usr/lib/php/20230831/pdo_mysql.so: undefined symbol: pdo_parse_params), /usr/lib/php/20230831/pdo_mysql.so.so (/usr/lib/php/20230831/pdo_mysql.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
 ```
 - OK php -l clean on all 8 PHP files
 - OK node --check clean on all 2 JS files
@@ -710,6 +703,13 @@ test_network_failure_is_typed (test_python_sdk.ExtHuntFixesTest.test_network_fai
 test_payment_link_url_helper (test_python_sdk.ExtHuntFixesTest.test_payment_link_url_helper) ... ok
 test_timeout_is_sent_and_configurable (test_python_sdk.ExtHuntFixesTest.test_timeout_is_sent_and_configurable) ... ok
 test_transactions_limit_is_clamped (test_python_sdk.ExtHuntFixesTest.test_transactions_limit_is_clamped) ... ok
+test_400_is_not_retried (test_python_sdk.RetryTest.test_400_is_not_retried) ... ok
+test_invoice_create_carries_auto_key (test_python_sdk.RetryTest.test_invoice_create_carries_auto_key) ... ok
+test_keyed_create_reuses_same_idempotency_key (test_python_sdk.RetryTest.test_keyed_create_reuses_same_idempotency_key) ... ok
+test_max_retries_zero_means_one_attempt (test_python_sdk.RetryTest.test_max_retries_zero_means_one_attempt) ... ok
+test_read_503_twice_then_200_succeeds_on_third_attempt (test_python_sdk.RetryTest.test_read_503_twice_then_200_succeeds_on_third_attempt) ... ok
+test_simulate_payment_and_quote_are_not_retried (test_python_sdk.RetryTest.test_simulate_payment_and_quote_are_not_retried) ... ok
+test_transport_failure_on_read_is_retried (test_python_sdk.RetryTest.test_transport_failure_on_read_is_retried) ... ok
 test_bitcoin_and_webhooks (test_python_sdk.SdkContractTest.test_bitcoin_and_webhooks) ... ok
 test_connector_config_and_sandbox_invoices (test_python_sdk.SdkContractTest.test_connector_config_and_sandbox_invoices) ... ok
 test_mobile_money_collections (test_python_sdk.SdkContractTest.test_mobile_money_collections) ... ok
@@ -721,13 +721,13 @@ test_wallets_sends_key_header (test_python_sdk.SdkContractTest.test_wallets_send
 test_known_answer_vector (test_python_sdk.WebhookVerifyTest.test_known_answer_vector) ... ok
 
 ----------------------------------------------------------------------
-Ran 16 tests
+Ran 23 tests
 
 OK
 ```
 - PHP SDK: tests/run-tests.php rc=0
 ```
-PASS  test key mode (got 'test')
+'test')
 PASS  live key mode (got 'live')
 PASS  bmg sandbox environment (got 'sandbox')
 PASS  bmg live environment (got 'production')
@@ -777,9 +777,32 @@ PASS  momo fee_bearer (got 'seller')
 PASS  KAT verifies
 PASS  KAT wrong secret fails
 PASS  KAT event type (got 'webhook.test')
+PASS  retry: read 503x2 then 200 succeeds (got 42)
+PASS  retry: read took 3 attempts (got 3)
+PASS  retry: two backoffs recorded (got 2)
+PASS  retry: first backoff in [0,100]
+PASS  retry: second backoff in [0,200]
+PASS  retry: keyed create succeeds after 503 (got 'ABC123')
+PASS  retry: keyed create took 2 attempts (got 2)
+PASS  retry: auto key sent
+PASS  retry: same key on the retry (got 'ef0cbe76d52002105e8a94831a1b1088')
+PASS  retry: explicit caller key honoured (got array (
+  0 => 'caller-key-123',
+  1 => 'caller-key-123',
+))
+PASS  retry: 400 status (got 400)
+PASS  retry: 400 took 1 attempt (got 1)
+PASS  retry: simulate-payment 503 (got 503)
+PASS  retry: simulate-payment took 1 attempt (got 1)
+PASS  retry: quote 503 (got 503)
+PASS  retry: quote took 1 attempt (got 1)
+PASS  retry: max_retries 0 status (got 503)
+PASS  retry: max_retries 0 took 1 attempt (got 1)
+PASS  retry: transport failure code (got 'network_error')
+PASS  retry: transport failure took 3 attempts (got 3)
+PASS  retry: invoice create carries an auto key
 
 ALL PHP SDK TESTS PASSED
-PHP Warning:  PHP Startup: Unable to load dynamic library 'pdo_mysql.so' (tried: /usr/lib/php/20230831/pdo_mysql.so (/usr/lib/php/20230831/pdo_mysql.so: undefined symbol: pdo_parse_params), /usr/lib/php/20230831/pdo_mysql.so.so (/usr/lib/php/20230831/pdo_mysql.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
 ```
 - React Native SDK: test/run-tests.mjs rc=0
 ```
@@ -820,6 +843,19 @@ PASS  EUR link refused
 PASS  refused calls sent nothing
 PASS  EUR invoice sent
 PASS  html 502 typed
+PASS  retry: read 503x2 then 200 succeeds
+PASS  retry: read took 3 attempts
+PASS  retry: two backoffs, in range
+PASS  retry: keyed create succeeds after 503
+PASS  retry: keyed create took 2 attempts
+PASS  retry: same auto key on both attempts
+PASS  retry: explicit caller key honoured
+PASS  retry: 400 not retried
+PASS  retry: simulate-payment not retried
+PASS  retry: bitcoin/quote not retried
+PASS  retry: maxRetries 0 means one attempt
+PASS  retry: transport failure retried
+PASS  retry: invoice create carries an auto key
 
 ALL REACT NATIVE SDK TESTS PASSED
 ```
@@ -842,9 +878,15 @@ ALL REACT NATIVE SDK TESTS PASSED
 00:00 +13: test/bmaglass_sdk_test.dart: ext-hunt fixes payment link create accepts int amounts
 00:00 +14: test/bmaglass_sdk_test.dart: ext-hunt fixes bad quote side is refused, not silently bought
 00:00 +15: test/bmaglass_sdk_test.dart: ext-hunt fixes hanging request times out as network_error
-00:00 +16: test/bmaglass_sdk_test.dart: ext-hunt fixes invoices are not currency-guarded
-00:00 +17: test/bmaglass_sdk_test.dart: ext-hunt fixes mobile-money create sends idempotency key; charge is 1% of base
-00:00 +18: All tests passed!
+00:01 +16: test/bmaglass_sdk_test.dart: ext-hunt fixes invoices are not currency-guarded
+00:01 +17: test/bmaglass_sdk_test.dart: ext-hunt fixes mobile-money create sends idempotency key; charge is 1% of base
+00:01 +18: test/bmaglass_sdk_test.dart: retries on transient 502/503/504 (CEO decision 2026-11-15) read 503 twice then 200 succeeds on the third attempt
+00:01 +19: test/bmaglass_sdk_test.dart: retries on transient 502/503/504 (CEO decision 2026-11-15) keyed create reuses the same idempotency key across retries
+00:01 +20: test/bmaglass_sdk_test.dart: retries on transient 502/503/504 (CEO decision 2026-11-15) a 400 is never retried
+00:01 +21: test/bmaglass_sdk_test.dart: retries on transient 502/503/504 (CEO decision 2026-11-15) simulate-payment and quote are not retried (no idempotency key)
+00:01 +22: test/bmaglass_sdk_test.dart: retries on transient 502/503/504 (CEO decision 2026-11-15) maxRetries 0 means one attempt
+00:01 +23: test/bmaglass_sdk_test.dart: retries on transient 502/503/504 (CEO decision 2026-11-15) invoice create carries an auto idempotency key
+00:01 +24: All tests passed!
 ```
 - Embed button: test-embed.mjs rc=0
 ```

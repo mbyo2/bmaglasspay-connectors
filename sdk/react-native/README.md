@@ -56,7 +56,18 @@ try {
 node sdk/react-native/test/run-tests.mjs
 ```
 
-(Node ≥ 22 runs the TypeScript sources via type stripping; 36 checks:
+(Node ≥ 22 runs the TypeScript sources via type stripping; 50 checks:
 SHA-256/HMAC vs `node:crypto`, shared webhook KAT, stub-fetch client
 behaviour, currency + test-mode guards, transport timeouts and id
-encoding.)
+encoding, plus the transient-retry pins.)
+
+## Retries
+
+Transient 502/503/504 (and transport failures) are retried automatically: up to 3 attempts total,
+exponential backoff with full jitter (base 500 ms, see `maxRetries` / `retryBaseDelayMs` in
+`BMaGlassOptions`). Only idempotent requests are retried — every GET/DELETE, and POSTs carrying an
+`Idempotency-Key`. Payment-link, invoice and transfer creates always send one key per logical call
+(pass your own as the second argument, or let the SDK generate one) and reuse it across retries, so
+a retried create replays the original object instead of creating a second one. `bitcoin/quote`,
+`simulate-payment` and webhook create/test are never retried (no idempotency key). Disable with
+`maxRetries: 0`.

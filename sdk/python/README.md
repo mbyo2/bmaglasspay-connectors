@@ -21,3 +21,14 @@ via the `timeout` constructor argument) also raise `BMaGlassError`
 (anything else raises `unsupported_currency`); invoices accept any
 3-letter currency. Use `payment_link_url(link_code)` for the
 buyer-facing hosted pay page URL.
+
+## Retries
+
+Transient 502/503/504 (and transport failures) are retried automatically: up to 3 attempts total,
+exponential backoff with full jitter (base 0.5 s, see `max_retries` / `retry_base_delay` in the
+constructor). Only idempotent requests are retried — every GET/DELETE, and POSTs carrying an
+`Idempotency-Key`. Payment-link, invoice and transfer creates always send one key per logical call
+(pass your own `idempotency_key`, or let the SDK generate one) and reuse it across retries, so a
+retried create replays the original object instead of creating a second one. `bitcoin/quote`,
+`simulate_payment` and webhook create/test are never retried (no idempotency key). Disable with
+`BMaGlass(..., max_retries=0)`.

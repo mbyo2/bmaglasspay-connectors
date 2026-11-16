@@ -24,3 +24,14 @@ via `timeoutMs`) also surface as `BMaGlassError` (`network_error`).
 Transfers and payment links accept ZMW and USD only (anything else throws
 `unsupported_currency`); invoices accept any 3-letter currency. Use
 `paymentLinkUrl(linkCode)` for the buyer-facing hosted pay page URL.
+
+## Retries
+
+Transient 502/503/504 (and transport failures) are retried automatically: up to 3 attempts total,
+exponential backoff with full jitter (base 500 ms, see `maxRetries` / `retryBaseDelayMs` in
+`BMaGlassOptions`). Only idempotent requests are retried — every GET/DELETE, and POSTs carrying an
+`Idempotency-Key`. Payment-link, invoice and transfer creates always send one key per logical call
+(pass your own as the second argument, or let the SDK generate one) and reuse it across retries, so
+a retried create replays the original object instead of creating a second one. `bitcoin/quote`,
+`simulate-payment` and webhook create/test are never retried (no idempotency key). Disable with
+`maxRetries: 0`.

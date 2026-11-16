@@ -55,9 +55,9 @@ final event = parseWebhookEvent(rawBody, signatureHeader, webhookSecret);
 
 ## Verification status
 
-**Verified 2026-11-15** on Dart SDK 3.14.0 (stable, linux x64 — cached
+**Verified 2026-11-16** on Dart SDK 3.14.0 (stable, linux x64 — cached
 at `~/.cache/bmaglass-dart-sdk/dart-sdk` on this VM): `dart analyze`
-reports no issues and `dart test` passes **17/17**. The earlier
+reports no issues and `dart test` passes **24/24**. The earlier
 "unrunnable here" note was wrong — the cached Dart toolchain runs the
 whole suite; no Flutter SDK install is needed. This is a pure-Dart package
 (no Flutter SDK dependency in `pubspec.yaml`), so the Dart toolchain
@@ -68,6 +68,17 @@ cross-SDK HMAC known-answer vector as the other SDK suites:
 ```bash
 cd sdk/flutter && dart test   # or: flutter test
 ```
+
+## Retries
+
+Transient 502/503/504 (and transport failures) are retried automatically: up to 3 attempts total,
+exponential backoff with full jitter (base 500 ms, see `maxRetries` / `retryBaseDelay` /
+`sleeper`). Only idempotent requests are retried — every GET/DELETE, and POSTs carrying an
+`Idempotency-Key`. Payment-link, invoice and transfer creates always send one key per logical call
+(pass your own `idempotencyKey`, or let the SDK generate one) and reuse it across retries, so a
+retried create replays the original object instead of creating a second one. `bitcoinQuote`,
+`simulatePaymentLinkPayment` / `simulateInvoicePayment` and webhook create/test are never retried
+(no idempotency key). Disable with `maxRetries: 0`.
 
 The client code itself is a line-for-line port of the proven Python
 SDK structure (same endpoints, headers and error mapping).

@@ -231,5 +231,133 @@ check('KAT wrong secret fails', !Client::verifyWebhookSignature($raw, $sig, 'whs
 $event = Client::parseWebhookEvent($raw, $sig, 'whsec_testsecret');
 eq('KAT event type', $event['type'], 'webhook.test');
 
+// ── Retries on transient 502/503/504 (CEO decision 2026-11-15) ──
+// Policy: max 3 attempts total; only idempotent requests are
+// retried (GET/DELETE, or POSTs carrying an Idempotency-Key);
+// backoff is exponential with full jitter.
+$scripted = function ($statuses, $payload, &$seen) {
+    $transport = function ($method, $url, $headers, $body) use ($statuses, $payload, &$seen) {
+        $seen['n']++;
+        $flat = implode(' ', $headers);
+        $key = null;
+        foreach ($headers as $h) {
+            if (strpos($h, 'Idempotency-Key: ') === 0) $key = substr($h, strlen('Idempotency-Key: '));
+        }
+        $seen['keys'][] = $key;
+        $status = $statuses[min($seen['n'] - 1, count($statuses) - 1)];
+        if ($status >= 400) return array($status, json_encode(array('error' => 'unavailable', 'message' => 'try again')));
+        return array($status, json_encode($payload ?: array('data' => array(array('id' => 'w1', 'currency' => 'ZMW', 'balance' => 42)), 'mode' => 'test')));
+    };
+    return $transport;
+};
+
+// (a) A read that 503s twice then answers succeeds on attempt 3.
+$seen = array('n' => 0, 'keys' => array(), 'delays' => array());
+$t = $scripted(array(503, 503, 200), null, $seen);
+$retryClient = new Client('bmp_test_contract', 'http://local.test', $t,
+    array('retry_base_delay_ms' => 100, 'sleep' => function ($ms) use (&$seen) { $seen['delays'][] = $ms; }));
+$wallets = $retryClient->wallets();
+eq('retry: read 503x2 then 200 succeeds', $wallets[0]['balance'], 42);
+eq('retry: read took 3 attempts', $seen['n'], 3);
+eq('retry: two backoffs recorded', count($seen['delays']), 2);
+check('retry: first backoff in [0,100]', $seen['delays'][0] >= 0 && $seen['delays'][0] <= 100);
+check('retry: second backoff in [0,200]', $seen['delays'][1] >= 0 && $seen['delays'][1] <= 200);
+
+// (b) A payment-link create retried after a 503 reuses the SAME
+// idempotency key — the server replays the original link.
+$seen = array('n' => 0, 'keys' => array(), 'delays' => array());
+$t = $scripted(array(503, 201), array('data' => array('id' => 'pl1', 'title' => 'Retry Link', 'amount' => 10, 'currency' => 'ZMW', 'link_code' => 'ABC123', 'status' => 'active'), 'mode' => 'test'), $seen);
+$retryClient = new Client('bmp_test_contract', 'http://local.test', $t,
+    array('retry_base_delay_ms' => 0, 'sleep' => function ($ms) {}));
+$link = $retryClient->createPaymentLink('Retry Link', 10, 'ZMW');
+eq('retry: keyed create succeeds after 503', $link['link_code'], 'ABC123');
+eq('retry: keyed create took 2 attempts', $seen['n'], 2);
+check('retry: auto key sent', $seen['keys'][0] !== null && $seen['keys'][0] !== '');
+eq('retry: same key on the retry', $seen['keys'][0], $seen['keys'][1]);
+$seen = array('n' => 0, 'keys' => array(), 'delays' => array());
+$t = $scripted(array(503, 201), array('data' => array('id' => 'pl1', 'link_code' => 'ABC123'), 'mode' => 'test'), $seen);
+$retryClient = new Client('bmp_test_contract', 'http://local.test', $t,
+    array('retry_base_delay_ms' => 0, 'sleep' => function ($ms) {}));
+$retryClient->createPaymentLink('Retry Link', 10, 'ZMW', null, null, null, null, 'caller-key-123');
+eq('retry: explicit caller key honoured', $seen['keys'], array('caller-key-123', 'caller-key-123'));
+
+// (c) A 400 is never retried.
+$seen = array('n' => 0, 'keys' => array(), 'delays' => array());
+$t = $scripted(array(400), null, $seen);
+$retryClient = new Client('bmp_test_contract', 'http://local.test', $t,
+    array('retry_base_delay_ms' => 0, 'sleep' => function ($ms) {}));
+try {
+    $retryClient->wallets();
+    check('retry: 400 not retried', false);
+} catch (ApiException $e) {
+    eq('retry: 400 status', $e->status, 400);
+    eq('retry: 400 took 1 attempt', $seen['n'], 1);
+}
+
+// (d) simulate-payment has no idempotency key: a 503 is NOT retried
+// (replaying it would double-count the simulated payment).
+$seen = array('n' => 0, 'keys' => array(), 'delays' => array());
+$t = $scripted(array(503), null, $seen);
+$retryClient = new Client('bmp_test_contract', 'http://local.test', $t,
+    array('retry_base_delay_ms' => 0, 'sleep' => function ($ms) {}));
+try {
+    $retryClient->simulatePaymentLinkPayment('link1');
+    check('retry: simulate-payment not retried', false);
+} catch (ApiException $e) {
+    eq('retry: simulate-payment 503', $e->status, 503);
+    eq('retry: simulate-payment took 1 attempt', $seen['n'], 1);
+}
+
+// (e) bitcoin/quote has no idempotency key: a 503 is NOT retried
+// (each call mints a quote row — a retry would mint two).
+$seen = array('n' => 0, 'keys' => array(), 'delays' => array());
+$t = $scripted(array(503), null, $seen);
+$retryClient = new Client('bmp_test_contract', 'http://local.test', $t,
+    array('retry_base_delay_ms' => 0, 'sleep' => function ($ms) {}));
+try {
+    $retryClient->bitcoinQuote('buy', 100);
+    check('retry: bitcoin/quote not retried', false);
+} catch (ApiException $e) {
+    eq('retry: quote 503', $e->status, 503);
+    eq('retry: quote took 1 attempt', $seen['n'], 1);
+}
+
+// (f) Retries off (max_retries 0): a 503 fails on the first attempt.
+$seen = array('n' => 0, 'keys' => array(), 'delays' => array());
+$t = $scripted(array(503, 200), null, $seen);
+$retryClient = new Client('bmp_test_contract', 'http://local.test', $t,
+    array('max_retries' => 0, 'retry_base_delay_ms' => 0, 'sleep' => function ($ms) {}));
+try {
+    $retryClient->wallets();
+    check('retry: max_retries 0 means one attempt', false);
+} catch (ApiException $e) {
+    eq('retry: max_retries 0 status', $e->status, 503);
+    eq('retry: max_retries 0 took 1 attempt', $seen['n'], 1);
+}
+
+// (g) A transport failure on a read is retried, then surfaces typed.
+$boomCalls = 0;
+$boom = function ($method, $url, $headers, $body) use (&$boomCalls) {
+    $boomCalls++;
+    throw new ApiException(0, 'network_error', "Couldn't reach BMaGlass Pay. (boom)");
+};
+$retryClient = new Client('bmp_test_contract', 'http://local.test', $boom,
+    array('retry_base_delay_ms' => 0, 'sleep' => function ($ms) {}));
+try {
+    $retryClient->wallets();
+    check('retry: transport failure retried', false);
+} catch (ApiException $e) {
+    eq('retry: transport failure code', $e->errorCode, 'network_error');
+    eq('retry: transport failure took 3 attempts', $boomCalls, 3);
+}
+
+// (h) Invoices also carry an auto key on every create.
+$seen = array('n' => 0, 'keys' => array(), 'delays' => array());
+$t = $scripted(array(201), array('data' => array('id' => 'inv1', 'status' => 'open'), 'mode' => 'test'), $seen);
+$retryClient = new Client('bmp_test_contract', 'http://local.test', $t,
+    array('retry_base_delay_ms' => 0, 'sleep' => function ($ms) {}));
+$retryClient->createInvoice(10, 'ZMW');
+check('retry: invoice create carries an auto key', $seen['keys'][0] !== null && $seen['keys'][0] !== '');
+
 echo $failures === 0 ? "\nALL PHP SDK TESTS PASSED\n" : "\n$failures FAILURE(S)\n";
 exit($failures === 0 ? 0 : 1);

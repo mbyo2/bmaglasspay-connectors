@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:http/http.dart' as http;
 
@@ -25,13 +26,33 @@ class BMaGlass {
   /// instead of hanging forever.
   final Duration timeout;
 
+  /// Retries after a transient failure (default 2 — 3 attempts total).
+  /// Only idempotent requests are ever retried: every GET/DELETE, and
+  /// POSTs that carry an Idempotency-Key (payment-link / invoice /
+  /// transfer creates — the SDK sends one per logical call — and
+  /// mobile-money collections, keyed by reference / idempotency_key).
+  /// A POST with no idempotency key (bitcoin/quote, simulate-payment,
+  /// webhook create/test) is never retried: the server could not tell
+  /// a retry from a second call. Retried failures are HTTP 502/503/504
+  /// and transport failures (including timeouts). Backoff is
+  /// exponential with full jitter: before retry N the client sleeps a
+  /// uniform random delay in [0, min(4000, retryBaseDelay * 2^(N-1))].
+  /// Set [maxRetries] to 0 to disable retries entirely.
+  final int maxRetries;
+
+  /// Base backoff (default 500ms). See [maxRetries].
+  final Duration retryBaseDelay;
+
+  /// Sleep implementation (tests). Defaults to [Future.delayed].
+  final Future<void> Function(Duration)? sleeper;
+
   /// Legacy mode name, from the key alone — same rule as the other SDKs.
   final String mode;
 
   /// "production" or "sandbox", derived ONLY from the key.
   final String environment;
 
-  BMaGlass({required String apiKey, String? baseUrl, http.Client? httpClient, Duration? timeout})
+  BMaGlass({required String apiKey, String? baseUrl, http.Client? httpClient, Duration? timeout, this.maxRetries = 2, this.retryBaseDelay = const Duration(milliseconds: 500), this.sleeper})
       : _apiKey = apiKey,
         _baseUrl = (baseUrl ?? defaultBase).replaceAll(RegExp(r'/$'), ''),
         _http = httpClient ?? http.Client(),
@@ -42,6 +63,15 @@ class BMaGlass {
       throw const BMaGlassException(
           0, 'invalid_api_key', 'apiKey must be a BMaGlass Pay API key (bmg_live_..., bmg_sandbox_..., or a legacy bmp_ key).');
     }
+  }
+
+  /// One fresh idempotency key per logical create. The same key is
+  /// reused across that call's retries, so the server replays the
+  /// original object instead of creating a second one.
+  static String newIdempotencyKey() {
+    final r = Random.secure();
+    final bytes = List<int>.generate(16, (_) => r.nextInt(256));
+    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   }
 
   bool get isLive => mode == 'live';
@@ -60,7 +90,45 @@ class BMaGlass {
     return c;
   }
 
+  /// Backoff before retry [attempt] (1-based): uniform in [0, cap],
+  /// cap doubling from [retryBaseDelay] up to 4000 ms.
+  Duration _retryDelay(int attempt) {
+    var capMs = retryBaseDelay.inMilliseconds * (1 << (attempt - 1));
+    if (capMs > 4000) capMs = 4000;
+    if (capMs < 0) capMs = 0;
+    return Duration(milliseconds: Random().nextInt(capMs + 1));
+  }
+
+  Future<void> _sleep(Duration d) async {
+    if (sleeper != null) {
+      await sleeper!(d);
+    } else {
+      await Future.delayed(d);
+    }
+  }
+
   Future<dynamic> _request(String method, String path,
+      {Map<String, dynamic>? body, Map<String, String>? headers}) async {
+    // Retryable iff the request is provably safe to repeat: a read, a
+    // delete, or a write carrying an Idempotency-Key (the server
+    // replays the original object for a repeated key). Anything else
+    // gets exactly one attempt — a blind retry could double-settle.
+    final retryable = method == 'GET' || method == 'DELETE' || (headers != null && headers.containsKey('Idempotency-Key'));
+    final maxAttempts = retryable ? (maxRetries + 1 < 1 ? 1 : maxRetries + 1) : 1;
+    var attempt = 0;
+    while (true) {
+      attempt++;
+      try {
+        return await _requestOnce(method, path, body: body, headers: headers);
+      } on BMaGlassException catch (e) {
+        final transient = e.code == 'network_error' || e.status == 502 || e.status == 503 || e.status == 504;
+        if (!transient || attempt >= maxAttempts) rethrow;
+        await _sleep(_retryDelay(attempt));
+      }
+    }
+  }
+
+  Future<dynamic> _requestOnce(String method, String path,
       {Map<String, dynamic>? body, Map<String, String>? headers}) async {
     final uri = Uri.parse('$_baseUrl/$path');
     final allHeaders = <String, String>{
@@ -134,12 +202,17 @@ class BMaGlass {
   /// POST /invoices — create an invoice in the key's environment.
   /// Invoices are NOT currency-guarded: the API accepts any 3-letter
   /// invoice currency (a payment request, not a wallet move).
+  /// Retried safely: one Idempotency-Key per logical call
+  /// (caller-supplied, or auto-generated) is reused across retries,
+  /// and the server replays the original invoice instead of creating
+  /// a second one.
   Future<Map<String, dynamic>> createInvoice({
     required num amount,
     String currency = 'ZMW',
     String? description,
     String? customerEmail,
     Map<String, dynamic>? metadata,
+    String? idempotencyKey,
   }) async {
     final body = <String, dynamic>{
       'amount': amount,
@@ -148,7 +221,8 @@ class BMaGlass {
     if (description != null) body['description'] = description;
     if (customerEmail != null) body['customer_email'] = customerEmail;
     if (metadata != null) body['metadata'] = metadata;
-    return await _request('POST', 'invoices', body: body) as Map<String, dynamic>;
+    return await _request('POST', 'invoices',
+        body: body, headers: {'Idempotency-Key': idempotencyKey ?? newIdempotencyKey()}) as Map<String, dynamic>;
   }
 
   /// POST /invoices/{id}/simulate-payment — sandbox only.
@@ -176,6 +250,9 @@ class BMaGlass {
 
   /// POST /transfers — wallet-to-wallet transfer (production keys only;
   /// 1.5% fee charged on top by the API, exactly like the app).
+  /// Retried safely: one Idempotency-Key per logical call
+  /// (caller-supplied, or auto-generated) is reused across retries,
+  /// and the server replays the original transfer.
   Future<Map<String, dynamic>> createTransfer({
     required String toUserId,
     required num amount,
@@ -193,7 +270,7 @@ class BMaGlass {
     };
     final data = await _request('POST', 'transfers',
         body: body,
-        headers: idempotencyKey == null ? null : {'Idempotency-Key': idempotencyKey});
+        headers: {'Idempotency-Key': idempotencyKey ?? newIdempotencyKey()});
     return data as Map<String, dynamic>;
   }
 
@@ -217,7 +294,10 @@ class BMaGlass {
   /// from `settings()` for this link only: "seller" — the fee comes out
   /// of what the seller receives; "buyer" — the fee is added on top and
   /// the seller receives the full price. [redirectUrl] is the buyer
-  /// return URL the hosted pay page offers after payment.
+  /// return URL the hosted pay page offers after payment. Retried
+  /// safely: one Idempotency-Key per logical call (caller-supplied, or
+  /// auto-generated) is reused across retries, and the server replays
+  /// the original link instead of creating a second one.
   Future<PaymentLink> createPaymentLink({
     required String title,
     num? amount,
@@ -226,6 +306,7 @@ class BMaGlass {
     String? expiresAt,
     String? feePayer,
     String? redirectUrl,
+    String? idempotencyKey,
   }) async {
     if (feePayer != null && feePayer != 'seller' && feePayer != 'buyer') {
       throw const BMaGlassException(0, 'invalid_fee_payer', "feePayer must be 'seller' or 'buyer'.");
@@ -239,7 +320,8 @@ class BMaGlass {
       if (feePayer != null) 'fee_payer': feePayer,
       if (redirectUrl != null) 'redirect_url': redirectUrl,
     };
-    final data = await _request('POST', 'payment-links', body: body) as Map<String, dynamic>;
+    final data = await _request('POST', 'payment-links',
+        body: body, headers: {'Idempotency-Key': idempotencyKey ?? newIdempotencyKey()}) as Map<String, dynamic>;
     return PaymentLink.fromJson(data);
   }
 
@@ -260,6 +342,10 @@ class BMaGlass {
   /// as the idempotency key: repeating a create with the same
   /// reference returns the original collection instead of charging
   /// the customer twice. Requires the mobile_money:create scope.
+  /// Retried safely: the effective key is the caller's
+  /// [idempotencyKey], else their [reference], else a fresh key sent
+  /// as idempotency_key — the same key rides every retry of this
+  /// logical call.
   Future<Map<String, dynamic>> createMobileMoneyCollection({
     required num amount,
     required String phone,
@@ -267,14 +353,17 @@ class BMaGlass {
     String? reference,
     String? idempotencyKey,
   }) async {
+    final key = idempotencyKey ?? reference ?? newIdempotencyKey();
     final body = <String, dynamic>{
       'amount': amount,
       'phone': phone,
       if (operator != null) 'operator': operator,
       if (reference != null) 'reference': reference,
       if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+      if (idempotencyKey == null && reference == null) 'idempotency_key': key,
     };
-    return await _request('POST', 'mobile-money/collections', body: body) as Map<String, dynamic>;
+    return await _request('POST', 'mobile-money/collections',
+        body: body, headers: {'Idempotency-Key': key}) as Map<String, dynamic>;
   }
 
   /// GET /mobile-money/collections/{reference} — a collection's
@@ -314,7 +403,9 @@ class BMaGlass {
 
   /// POST /bitcoin/quote — quote only; execution stays in the app.
   /// [side] must be "buy" or "sell": a typo here used to be silently
-  /// treated as a buy quote, which flips the money direction.
+  /// treated as a buy quote, which flips the money direction. Not
+  /// retried: each call mints a quote row (no idempotency key), so a
+  /// retry after a 503 would mint a second quote.
   Future<Map<String, dynamic>> bitcoinQuote({required String side, num? amountZmw, num? amountSats}) async {
     if (side != 'buy' && side != 'sell') {
       throw const BMaGlassException(0, 'invalid_side', "side must be 'buy' or 'sell'.");

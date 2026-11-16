@@ -38,13 +38,42 @@ class Client
     private $baseUrl;
     /** @var callable|null fn(string $method, string $url, array $headers, ?string $body): array{0:int,1:string} */
     private $transport;
+    /** @var int Retries after a transient failure (default 2 = 3 attempts total). */
+    private $maxRetries;
+    /** @var int Base backoff in milliseconds (default 500). */
+    private $retryBaseDelayMs;
+    /** @var callable|null fn(int $ms): void — sleep override (tests). */
+    private $sleepFn;
 
     /**
      * @param string        $apiKey    bmg_live_..., bmg_sandbox_... or legacy bmp_ key.
      * @param string|null   $baseUrl   API base override (tests).
      * @param callable|null $transport HTTP transport override (tests).
+     * @param array         $options   Retry options: 'max_retries' (default 2 — 3
+     *                                 attempts total; 0 disables retries),
+     *                                 'retry_base_delay_ms' (default 500),
+     *                                 'sleep' (callable fn(int $ms): void, tests).
+     *                                 Only idempotent requests are ever
+     *                                 retried: every GET/DELETE, and POSTs
+     *                                 that carry an Idempotency-Key
+     *                                 (payment-link / invoice / transfer
+     *                                 creates — the SDK sends one per
+     *                                 logical call — and mobile-money
+     *                                 collections, keyed by reference /
+     *                                 idempotency_key). A POST with no
+     *                                 idempotency key (bitcoin/quote,
+     *                                 simulate-payment, webhook
+     *                                 create/test) is never retried: the
+     *                                 server could not tell a retry from
+     *                                 a second call. Retried failures are
+     *                                 HTTP 502/503/504 and transport
+     *                                 failures (including timeouts).
+     *                                 Backoff is exponential with full
+     *                                 jitter: before retry N the client
+     *                                 sleeps a uniform random delay in
+     *                                 [0, min(4000, base * 2^(N-1))] ms.
      */
-    public function __construct($apiKey, $baseUrl = null, $transport = null)
+    public function __construct($apiKey, $baseUrl = null, $transport = null, $options = array())
     {
         if (!is_string($apiKey) || (strpos($apiKey, 'bmg_') !== 0 && strpos($apiKey, 'bmp_') !== 0)) {
             throw new ApiException(0, 'invalid_api_key',
@@ -53,6 +82,17 @@ class Client
         $this->apiKey = $apiKey;
         $this->baseUrl = rtrim($baseUrl ? $baseUrl : self::DEFAULT_BASE, '/');
         $this->transport = $transport;
+        $this->maxRetries = isset($options['max_retries']) ? (int) $options['max_retries'] : 2;
+        $this->retryBaseDelayMs = isset($options['retry_base_delay_ms']) ? (int) $options['retry_base_delay_ms'] : 500;
+        $this->sleepFn = isset($options['sleep']) && is_callable($options['sleep']) ? $options['sleep'] : null;
+    }
+
+    /** One fresh idempotency key per logical create. The same key is
+     *  reused across that call's retries, so the server replays the
+     *  original object instead of creating a second one. */
+    public static function newIdempotencyKey()
+    {
+        return bin2hex(random_bytes(16));
     }
 
     /** 'live' or 'test', from the key prefix — same rule as the other SDKs. */
@@ -125,14 +165,18 @@ class Client
     /** POST /invoices — create an invoice in the key's environment.
      *  Invoices are NOT currency-guarded: the API accepts any 3-letter
      *  invoice currency (a payment request, not a wallet move), so
-     *  refusing EUR/GBP here would block valid API calls. */
-    public function createInvoice($amount, $currency = 'ZMW', $description = null, $customerEmail = null, $metadata = null)
+     *  refusing EUR/GBP here would block valid API calls. Retried
+     *  safely: one Idempotency-Key per logical call (caller-supplied,
+     *  or auto-generated) is reused across retries, and the server
+     *  replays the original invoice instead of creating a second one. */
+    public function createInvoice($amount, $currency = 'ZMW', $description = null, $customerEmail = null, $metadata = null, $idempotencyKey = null)
     {
         $body = array('amount' => $amount, 'currency' => $currency);
         if ($description !== null) $body['description'] = $description;
         if ($customerEmail !== null) $body['customer_email'] = $customerEmail;
         if ($metadata !== null) $body['metadata'] = $metadata;
-        return $this->request('POST', 'invoices', $body);
+        return $this->request('POST', 'invoices', $body,
+            array('Idempotency-Key' => $idempotencyKey !== null ? $idempotencyKey : self::newIdempotencyKey()));
     }
 
     /**
@@ -170,6 +214,9 @@ class Client
     /**
      * POST /transfers — wallet-to-wallet transfer (production keys only;
      * 1.5% fee charged on top by the API, exactly like the app).
+     * Retried safely: one Idempotency-Key per logical call
+     * (caller-supplied, or auto-generated) is reused across retries,
+     * and the server replays the original transfer.
      */
     public function createTransfer($toUserId, $amount, $currency = 'ZMW', $description = null, $recipientName = null, $idempotencyKey = null)
     {
@@ -180,7 +227,7 @@ class Client
         );
         if ($description !== null) $body['description'] = $description;
         if ($recipientName !== null) $body['recipient_name'] = $recipientName;
-        $headers = $idempotencyKey ? array('Idempotency-Key' => $idempotencyKey) : array();
+        $headers = array('Idempotency-Key' => $idempotencyKey !== null ? $idempotencyKey : self::newIdempotencyKey());
         return $this->request('POST', 'transfers', $body, $headers);
     }
 
@@ -212,9 +259,12 @@ class Client
      * top and the seller receives the full price. $redirectUrl is the
      * buyer return URL the hosted pay page offers after payment.
      * The returned row carries the resolved fee_payer plus
-     * fee_amount / buyer_total / seller_receives.
+     * fee_amount / buyer_total / seller_receives. Retried safely:
+     * one Idempotency-Key per logical call (caller-supplied, or
+     * auto-generated) is reused across retries, and the server
+     * replays the original link instead of creating a second one.
      */
-    public function createPaymentLink($title, $amount = null, $currency = 'ZMW', $description = null, $expiresAt = null, $feePayer = null, $redirectUrl = null)
+    public function createPaymentLink($title, $amount = null, $currency = 'ZMW', $description = null, $expiresAt = null, $feePayer = null, $redirectUrl = null, $idempotencyKey = null)
     {
         $body = array('title' => (string) $title, 'currency' => self::assertSupportedCurrency($currency));
         if ($amount !== null) $body['amount'] = round((float) $amount, 2);
@@ -227,7 +277,8 @@ class Client
             $body['fee_payer'] = $feePayer;
         }
         if ($redirectUrl !== null) $body['redirect_url'] = (string) $redirectUrl;
-        return $this->request('POST', 'payment-links', $body);
+        return $this->request('POST', 'payment-links', $body,
+            array('Idempotency-Key' => $idempotencyKey !== null ? $idempotencyKey : self::newIdempotencyKey()));
     }
 
     /** GET /payment-links/{id}/attempts — a link's Bitcoin payment attempts. */
@@ -250,6 +301,10 @@ class Client
      * charging the customer twice. Gate errors: 400
      * business_not_set_up / not_configured, 403 not_entitled /
      * business_inactive. Requires the mobile_money:create scope.
+     * Retried safely: the effective key is the caller's
+     * idempotency_key, else their reference (which doubles as the key
+     * server-side), else a fresh key sent as idempotency_key — the
+     * same key rides every retry of this logical call.
      */
     public function createMobileMoneyCollection($amount, $phone, $operator = null, $reference = null, $idempotencyKey = null)
     {
@@ -257,7 +312,9 @@ class Client
         if ($operator !== null) $body['operator'] = $operator;
         if ($reference !== null) $body['reference'] = $reference;
         if ($idempotencyKey !== null) $body['idempotency_key'] = $idempotencyKey;
-        return $this->request('POST', 'mobile-money/collections', $body);
+        $key = $idempotencyKey !== null ? $idempotencyKey : ($reference !== null ? $reference : self::newIdempotencyKey());
+        if ($idempotencyKey === null && $reference === null) $body['idempotency_key'] = $key;
+        return $this->request('POST', 'mobile-money/collections', $body, array('Idempotency-Key' => $key));
     }
 
     /**
@@ -302,7 +359,9 @@ class Client
 
     /** POST /bitcoin/quote — quote only; execution stays in the app.
      *  `side` must be "buy" or "sell": a typo here used to be silently
-     *  treated as a buy quote, which flips the money direction. */
+     *  treated as a buy quote, which flips the money direction. Not
+     *  retried: each call mints a quote row (no idempotency key), so a
+     *  retry after a 503 would mint a second quote. */
     public function bitcoinQuote($side, $amountZmw = null, $amountSats = null)
     {
         if ($side !== 'buy' && $side !== 'sell') {
@@ -376,6 +435,23 @@ class Client
 
     // ── Transport ────────────────────────────────────────────────
 
+    /** Backoff before retry $attempt (1-based): uniform in [0, cap]
+     *  ms, cap doubling from retryBaseDelayMs up to 4000 ms. */
+    private function retryDelayMs($attempt)
+    {
+        $cap = min(4000, $this->retryBaseDelayMs * (int) pow(2, $attempt - 1));
+        return random_int(0, $cap);
+    }
+
+    private function sleepMs($ms)
+    {
+        if ($this->sleepFn !== null) {
+            call_user_func($this->sleepFn, $ms);
+        } else {
+            usleep($ms * 1000);
+        }
+    }
+
     private function request($method, $path, $body = null, $headers = array())
     {
         $url = $this->baseUrl . '/' . ltrim($path, '/');
@@ -387,6 +463,34 @@ class Client
         }
         $rawBody = $body !== null ? json_encode($body) : null;
 
+        // Retryable iff the request is provably safe to repeat: a
+        // read, a delete, or a write carrying an Idempotency-Key (the
+        // server replays the original object for a repeated key).
+        // Anything else gets exactly one attempt — a blind retry
+        // could double-settle.
+        $retryable = $method === 'GET' || $method === 'DELETE';
+        if (!$retryable) {
+            foreach ($allHeaders as $h) {
+                if (strpos($h, 'Idempotency-Key: ') === 0) { $retryable = true; break; }
+            }
+        }
+        $maxAttempts = $retryable ? max(1, $this->maxRetries + 1) : 1;
+        $attempt = 0;
+        while (true) {
+            $attempt++;
+            try {
+                return $this->requestOnce($method, $url, $allHeaders, $rawBody);
+            } catch (ApiException $e) {
+                $transient = $e->errorCode === 'network_error'
+                    || in_array($e->status, array(502, 503, 504), true);
+                if (!$transient || $attempt >= $maxAttempts) throw $e;
+                $this->sleepMs($this->retryDelayMs($attempt));
+            }
+        }
+    }
+
+    private function requestOnce($method, $url, $allHeaders, $rawBody)
+    {
         if ($this->transport !== null) {
             list($status, $text) = call_user_func($this->transport, $method, $url, $allHeaders, $rawBody);
         } else {
